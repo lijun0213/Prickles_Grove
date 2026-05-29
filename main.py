@@ -52,7 +52,72 @@ class Game:
     def update(self):
         pass
 
+    # Draw everything to screen
+    def draw(self):
+        self.screen.fill(BLACK)
+ 
+        if self.current_scene == 0:
+            self.draw_main_menu()
+        else:
+            self.draw_placeholder(self.current_scene)
+ 
+        pygame.display.flip()
+
     # Main Menu screen
+    def draw_main_menu(self):
+        font_big   = pygame.font.SysFont("Arial", 48, bold=True)
+        font_small = pygame.font.SysFont("Arial", 20)
+ 
+        # Title
+        title = font_big.render("Prickle's Grove", True, WHITE)
+        self.screen.blit(title, (
+            SCREEN_WIDTH  // 2 - title.get_width()  // 2,
+            SCREEN_HEIGHT // 2 - 80
+        ))
+ 
+        # Subtitle
+        sub = font_small.render("Press SPACE to start", True, WHITE)
+        self.screen.blit(sub, (
+            SCREEN_WIDTH  // 2 - sub.get_width()  // 2,
+            SCREEN_HEIGHT // 2
+        ))
+
+        # Controls hint
+        hint = font_small.render("ESC = quit", True, WHITE)
+        self.screen.blit(hint, (10, SCREEN_HEIGHT - 30))
+
+    def draw_placeholder(self, scene_num):
+        colours = {
+            1: (0, 0, 0),
+            2: (0, 0, 0),   
+            3: (0, 0, 0),   
+            4: (0, 0, 0), 
+        }
+        names = {
+            1: "Scene 1 — Prickle's Home     (Lew Li Jun)",
+            2: "Scene 2 — Mushroom Meadow    (Tan Zheng Da)",
+            3: "Scene 3 — Thorned Canopy     (Tai Zhen Zhou)",
+            4: "Scene 4 — Petal Plains       (Wu Xiaoen)",
+        }
+ 
+        self.screen.fill(colours.get(scene_num, BLACK))
+ 
+        font = pygame.font.SysFont("Arial", 24, bold=True)
+        font_small = pygame.font.SysFont("Arial", 18)
+ 
+        # Scene name
+        label = font.render(names.get(scene_num, ""), True, WHITE)
+        self.screen.blit(label, (
+            SCREEN_WIDTH  // 2 - label.get_width()  // 2,
+            SCREEN_HEIGHT // 2 - 40
+        ))
+ 
+        # Navigation hint
+        hint = font_small.render("SPACE = next scene    ESC = quit", True, WHITE)
+        self.screen.blit(hint, (
+            SCREEN_WIDTH  // 2 - hint.get_width()  // 2,
+            SCREEN_HEIGHT // 2 + 10
+        ))
 
 
 # START GAME
