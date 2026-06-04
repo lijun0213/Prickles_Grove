@@ -6,6 +6,7 @@
 import pygame
 import sys
 from settings import *
+from scene1 import Scene1
 
 class Game:
     def __init__(self):
@@ -14,7 +15,7 @@ class Game:
  
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock  = pygame.time.Clock()
- 
+
         self.current_scene = 0  # 0 = main menu, 1-4 = scenes
         self.running = True
 
@@ -47,9 +48,9 @@ class Game:
  
                 # Press SPACE to go to next scene (temporary for testing)
                 if event.key == pygame.K_SPACE:
-                    self.current_scene += 1
-                    if self.current_scene > 4:
-                        self.current_scene = 0
+                    if self.current_scene == 0 :
+                        self.current_scene = 1
+                        self.scene = Scene1()
 
     # Update game logic
     def update(self):
@@ -58,14 +59,17 @@ class Game:
             self.blink_show  = not self.blink_show  # flip on/off
             self.blink_timer = 0
 
+        if self.current_scene == 1:
+            self.scene.update()
+
     # Draw everything to screen
     def draw(self):
         self.screen.fill(BLACK)
  
         if self.current_scene == 0:
             self.draw_main_menu()
-        else:
-            self.draw_placeholder(self.current_scene)
+        elif self.current_scene == 1 and self.scene:
+            self.scene.draw(self.screen)
  
         pygame.display.flip()
 
