@@ -17,6 +17,9 @@ class Game:
  
         self.current_scene = 0  # 0 = main menu, 1-4 = scenes
         self.running = True
+
+        self.blink_timer = 0
+        self.blink_show  = True
  
     # Main loop
     def run(self):
@@ -50,7 +53,10 @@ class Game:
 
     # Update game logic
     def update(self):
-        pass
+        self.blink_timer += 1
+        if self.blink_timer >= 30:  # every 30 frames = 0.5 seconds
+            self.blink_show  = not self.blink_show  # flip on/off
+            self.blink_timer = 0
 
     # Draw everything to screen
     def draw(self):
@@ -65,6 +71,10 @@ class Game:
 
     # Main Menu screen
     def draw_main_menu(self):
+        # bg = pygame.image.load("")
+        # bg = pygame.transform.scale(bg, (800, 500))
+        # self.screen.blit(bg, (0, 0))
+
         font_big   = pygame.font.SysFont("Arial", 48, bold=True)
         font_small = pygame.font.SysFont("Arial", 20)
  
@@ -76,11 +86,12 @@ class Game:
         ))
  
         # Subtitle
-        sub = font_small.render("Press SPACE to start", True, WHITE)
-        self.screen.blit(sub, (
-            SCREEN_WIDTH  // 2 - sub.get_width()  // 2,
-            SCREEN_HEIGHT // 2
-        ))
+        if self.blink_show:
+            msg = font_small.render("PRESS SPACE TO START", True, WHITE)
+            self.screen.blit(msg, (
+                SCREEN_WIDTH  // 2 - msg.get_width()  // 2,
+                SCREEN_HEIGHT // 2
+            ))        
 
         # Controls hint
         hint = font_small.render("ESC = quit", True, WHITE)
