@@ -30,6 +30,7 @@ class Player(pygame.sprite.Sprite):
             return frames
 
         prickleIdleFrames = extractFrames (prickleIdle, 2)
+        prickleIdleLFrames = [pygame.transform.flip(f, True, False) for f in prickleIdleFrames]
         prickleWalkRFrames = extractFrames (prickleWalk, 6)
         prickleWalkLFrames = [pygame.transform.flip(f, True, False) for f in prickleWalkRFrames]
         prickleSleepFrames = extractFrames (prickleSleep, 3)
@@ -38,6 +39,7 @@ class Player(pygame.sprite.Sprite):
 
         self.animations = {
             'idle'       : prickleIdleFrames,
+            'idle_left'  : prickleIdleLFrames,
             'walk_right' : prickleWalkRFrames,
             'walk_left'  : prickleWalkLFrames,
             'sleep'      : prickleSleepFrames,
@@ -45,7 +47,8 @@ class Player(pygame.sprite.Sprite):
             'angry_left' : prickleAngryLFrames
         }
 
-        self.defaultFrames = prickleIdleFrames
+        self.idleFrames = prickleIdleFrames
+        self.idleLeftFrames = prickleIdleLFrames
         self.walkingRightFrames = prickleWalkRFrames
         self.walkingLeftFrames = prickleWalkLFrames
         self.sleepingFrames = prickleSleepFrames
@@ -53,12 +56,12 @@ class Player(pygame.sprite.Sprite):
         self.angryLeftFrames = prickleAngryLFrames
 
         # animation
-        self.currentFrames = self.defaultFrames
+        self.currentFrames = self.idleFrames
         self.animIndex = 0 
         self.animTimer = 0
         self.animSpeed = 12
 
-        self.image = self.defaultFrames[0]
+        self.image = self.idleFrames[0]
         self.rect = self.image.get_rect()
         self.rect.x = 100
         self.rect.y = 300
@@ -75,12 +78,12 @@ class Player(pygame.sprite.Sprite):
     def move(self, keys):
         self.isAngry = keys[pygame.K_TAB]
 
-        if keys[pygame.K_LEFT]:
+        if keys[pygame.K_a]:
             self.rect.x -= 5
             self.direction = -1
             self.facingRight = False
 
-        elif keys[pygame.K_RIGHT]:
+        elif keys[pygame.K_d]:
             self.rect.x += 5
             self.direction = 1
             self.facingRight = True            
@@ -92,13 +95,10 @@ class Player(pygame.sprite.Sprite):
             self.velocityY = -15
             self.onGround = False
 
-
         # Apply gravity
         self.velocityY += 1
         self.rect.y += self.velocityY
 
-        # --- ADD THIS FLOOR CHECK ---
-        # Adjust 300 to match wherever your game's floor level actually is
         if self.rect.y >= 300:
             self.rect.y = 300
             self.velocityY = 0
@@ -112,7 +112,7 @@ class Player(pygame.sprite.Sprite):
             newFrames = self.walkingLeftFrames
 
         else:
-            newFrames = self.defaultFrames
+            newFrames = self.idleFrames if self.facingRight else self.idleLeftFrames
 
         if keys[pygame.K_TAB]:
             newFrames = self.angryRightFrames if self.facingRight else self.angryLeftFrames    
