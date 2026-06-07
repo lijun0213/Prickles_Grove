@@ -73,7 +73,7 @@ class Player(pygame.sprite.Sprite):
         self.animate(keys)
 
     def move(self, keys):
-        self.isAngry = keys[pygame.K_TAB]  # ADD THIS
+        self.isAngry = keys[pygame.K_TAB]
 
         if keys[pygame.K_LEFT]:
             self.rect.x -= 5
@@ -105,10 +105,7 @@ class Player(pygame.sprite.Sprite):
             self.onGround = True
 
     def animate(self, keys):
-        if keys[pygame.K_TAB]:           # ADD: angry takes priority
-            newFrames = self.angryRightFrames if self.facingRight else self.angryLeftFrames
-
-        elif self.direction == 1:
+        if self.direction == 1:
             newFrames = self.walkingRightFrames
 
         elif self.direction == -1:
@@ -116,6 +113,9 @@ class Player(pygame.sprite.Sprite):
 
         else:
             newFrames = self.defaultFrames
+
+        if keys[pygame.K_TAB]:
+            newFrames = self.angryRightFrames if self.facingRight else self.angryLeftFrames    
 
         if newFrames != self.currentFrames:
             self.currentFrames = newFrames
