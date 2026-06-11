@@ -9,13 +9,13 @@ class Player(pygame.sprite.Sprite):
 
         # Prickle sprite sheet
         prickleIdle = pygame.image.load(r"assets/idle.png").convert_alpha()
-        prickleIdle = pygame.transform.scale_by(prickleIdle, 5.0)
+        prickleIdle = pygame.transform.scale_by(prickleIdle, 3.0)
         prickleWalk = pygame.image.load(r"assets/walk.png").convert_alpha()
-        prickleWalk = pygame.transform.scale_by(prickleWalk, 5.0)
+        prickleWalk = pygame.transform.scale_by(prickleWalk, 3.0)
         prickleSleep = pygame.image.load(r"assets/sleep.png").convert_alpha()
-        prickleSleep = pygame.transform.scale_by(prickleSleep, 5.0)
+        prickleSleep = pygame.transform.scale_by(prickleSleep, 3.0)
         prickleAngry = pygame.image.load(r"assets/angry.png").convert_alpha()
-        prickleAngry = pygame.transform.scale_by(prickleAngry, 5.0)
+        prickleAngry = pygame.transform.scale_by(prickleAngry, 3.0)
 
         # Extract frames
         def extractFrames(sheet, numFrames):
@@ -76,7 +76,8 @@ class Player(pygame.sprite.Sprite):
         self.animate(keys)
 
     def move(self, keys):
-        self.isAngry = keys[pygame.K_TAB]
+        mouse_buttons = pygame.mouse.get_pressed()
+        self.isAngry = mouse_buttons[0] # left click
 
         if keys[pygame.K_a]:
             self.rect.x -= 5
@@ -114,7 +115,7 @@ class Player(pygame.sprite.Sprite):
         else:
             newFrames = self.idleFrames if self.facingRight else self.idleLeftFrames
 
-        if keys[pygame.K_TAB]:
+        if self.isAngry:
             newFrames = self.angryRightFrames if self.facingRight else self.angryLeftFrames    
 
         if newFrames != self.currentFrames:
@@ -129,3 +130,13 @@ class Player(pygame.sprite.Sprite):
             self.animIndex = (self.animIndex + 1) % len(self.currentFrames)
 
         self.image = self.currentFrames[self.animIndex]
+
+# class Attack(pygame.sprite.Sprite):
+#     def __int__(self, x, y, direction):
+#         pygame.sprite.Sprite.__init__(self)
+#         self.speed = 10
+#         self.image = 
+#         self.rect = self.image.get_rect()
+#         self.rect.center = (x, y)
+#         self.direction = direction
+
