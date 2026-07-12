@@ -7,6 +7,7 @@ import pygame
 import sys
 from settings import *
 from scene1 import Scene1
+from scene3 import Scene3
 
 class Game:
     def __init__(self):
@@ -46,11 +47,12 @@ class Game:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
  
-                # Press SPACE to go to next scene (temporary for testing)
+                # Press SPACE to go to next scene (temporary for testing — jumps
+                # straight to Scene 3 so it can be tested standalone)
                 if event.key == pygame.K_SPACE:
                     if self.current_scene == 0 :
-                        self.current_scene = 1
-                        self.scene = Scene1()
+                        self.current_scene = 3
+                        self.scene = Scene3()
 
     # Update game logic
     def update(self):
@@ -59,16 +61,16 @@ class Game:
             self.blink_show  = not self.blink_show  # flip on/off
             self.blink_timer = 0
 
-        if self.current_scene == 1:
+        if self.current_scene != 0:
             self.scene.update()
 
     # Draw everything to screen
     def draw(self):
         self.screen.fill(BLACK)
- 
+
         if self.current_scene == 0:
             self.draw_main_menu()
-        elif self.current_scene == 1 and self.scene:
+        elif self.current_scene != 0 and self.scene:
             self.scene.draw(self.screen)
  
         pygame.display.flip()

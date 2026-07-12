@@ -1,4 +1,5 @@
 import pygame
+from settings import SCREEN_WIDTH
 
 pygame.init()
 
@@ -62,7 +63,7 @@ class Player(pygame.sprite.Sprite):
         self.currentFrames = self.idleFrames
         self.animIndex = 0 
         self.animTimer = 0
-        self.animSpeed = 12
+        self.animSpeed = 5
 
         self.image = self.idleFrames[0]
         self.rect = self.image.get_rect()
@@ -113,6 +114,12 @@ class Player(pygame.sprite.Sprite):
 
         else:
             self.direction = 0
+
+        # Keep Prickle inside the screen horizontally
+        if self.rect.left < 0:
+            self.rect.left = 0
+        elif self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH
 
         if keys[pygame.K_SPACE] and self.onGround:
             self.velocityY = -15

@@ -2,7 +2,7 @@ import pygame
 from settings import *
 from player import Player
 
-class Scene1:
+class Scene0:
     def __init__(self):
 
         self.bg = pygame.image.load(r"scene1_assets/scene1_background.png").convert_alpha()
