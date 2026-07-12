@@ -19,8 +19,9 @@ class Scene3:
         # the screen). Increasing it reveals higher parts of the canopy.
         self.scrollY = 0
         self.maxScrollY = max(0, self.bgHeight - SCREEN_HEIGHT)
-
-        self.player = Player()
+        
+        self.bullets = pygame.sprite.Group()
+        self.player = Player(self.bullets)
 
         self.groundY = SCREEN_HEIGHT
         self.player.rect.x = 100
@@ -30,6 +31,7 @@ class Scene3:
     def update(self):
         keys = pygame.key.get_pressed()
         self.player.update(keys)
+        self.bullets.update()
 
         # TODO: once climbing obstacles (vines/thorned branches) are in, drive
         # self.scrollY off the player's vertical progress instead of leaving it
@@ -41,3 +43,5 @@ class Scene3:
         bgY = SCREEN_HEIGHT - self.bgHeight + self.scrollY
         screen.blit(self.bg, (0, bgY))
         screen.blit(self.player.image, self.player.rect)
+        self.bullets.draw(screen)
+        self.player.drawAmmo(screen)

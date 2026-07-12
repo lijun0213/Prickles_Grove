@@ -5,7 +5,7 @@ pygame.init()
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, bulletGroup):
         super().__init__()
 
         # Prickle sprite sheet
@@ -17,6 +17,14 @@ class Player(pygame.sprite.Sprite):
         prickleRun = pygame.transform.scale_by(prickleRun, 1.2)
         prickleAttack= pygame.image.load(r"assets/prickle_attack.png").convert_alpha()
         prickleAttack = pygame.transform.scale_by(prickleAttack, 1.2)
+
+        self.bulletGroup = bulletGroup
+
+        self.ammoFull = pygame.image.load(r"assets/ammo_full.png").convert_alpha()
+        self.ammoFull = pygame.transform.scale_by(self.ammoFull, 0.6)
+
+        self.ammoEmpty = pygame.image.load(r"assets/ammo_empty.png").convert_alpha()
+        self.ammoEmpty = pygame.transform.scale_by(self.ammoEmpty, 0.6)
 
         # Extract frames
         def extractFrames(sheet, numFrames):
@@ -68,8 +76,8 @@ class Player(pygame.sprite.Sprite):
         self.image = self.idleFrames[0]
         self.rect = self.image.get_rect()
         self.rect.x = 100
-        self.rect.y = 300        
         self.groundY = 300
+        self.rect.bottom = self.groundY
         self.imageOffsetY = 0
 
         self.velocityY = 0
@@ -85,7 +93,7 @@ class Player(pygame.sprite.Sprite):
         self.attackCooldown = 0
         self.attackCooldownMax = 15
 
-        self.maxAmmo = 6
+        self.maxAmmo = 3
         self.ammo = self.maxAmmo
         self.reloadTimer = 0
         self.reloadRate = 120
@@ -93,14 +101,13 @@ class Player(pygame.sprite.Sprite):
 
     def update(self, keys):
         self.move(keys) 
+        self.handleAmmo()
+        self.handleAttack()
         self.animate(keys)
 
     def move(self, keys):
         self.isRunning = keys[pygame.K_LSHIFT]
         self.speed = 8 if self.isRunning else 5
-
-        mouse_buttons = pygame.mouse.get_pressed()
-        self.attack = mouse_buttons[0] # left click
 
         if keys[pygame.K_a]:
             self.rect.x -= self.speed
@@ -136,6 +143,59 @@ class Player(pygame.sprite.Sprite):
         else:
             self.onGround = False
 
+    def handleAttack(self):
+        mouse_buttons = pygame.mouse.get_pressed()
+        mousePressed = mouse_buttons[0] # left click
+
+        if self.attackCooldown > 0:
+            self.attackCooldown -= 1
+
+        justClicked = mousePressed and not self.mousePressed
+        fire = justClicked and self.attackCooldown == 0 and self.ammo > 0
+
+        if fire:
+            self.shoot()
+            self.ammo -= 1
+            self.attackCooldown = self.attackCooldownMax
+            self.attackTimer = 10
+
+        self.mousePressed = mousePressed
+
+        if self.attackTimer > 0:
+            self.attackTimer -= 1
+            self.isAttacking = True
+        else:
+            self.isAttacking = False
+
+    def handleAmmo(self):
+        if self.ammo < self.maxAmmo:
+            self.reloadTimer += 1
+            if self.reloadTimer >= self.reloadRate:
+                self.ammo += 1
+                self.reloadTimer = 0
+        else:
+            self.reloadTimer = 0
+
+    def shoot(self):
+        direction = 1 if self.facingRight else -1
+        bulletX = self.rect.centerx + (direction * self.rect.width // 2)
+        bulletY = self.rect.centery
+        bullet = Bullet(bulletX, bulletY, direction)
+        self.bulletGroup.add(bullet)
+
+    def drawAmmo(self, screen):
+        ammoX = 20
+        ammoY = 80
+        spacing = 65
+
+        for i in range(self.maxAmmo):
+            if i < self.ammo:
+                image = self.ammoFull
+            else:
+                image = self.ammoEmpty
+
+            screen.blit(image,(ammoX + i * spacing, ammoY))
+
     def animate(self, keys):
         if self.direction == 1:
             newFrames = self.runningRightFrames if self.isRunning else self.walkingRightFrames
@@ -146,7 +206,7 @@ class Player(pygame.sprite.Sprite):
         else:
             newFrames = self.idleFrames if self.facingRight else self.idleLeftFrames
 
-        if self.attack:
+        if self.isAttacking:
             newFrames = self.attackRightFrames if self.facingRight else self.attackLeftFrames
 
         if newFrames != self.currentFrames:
@@ -169,8 +229,8 @@ class Player(pygame.sprite.Sprite):
         self.rect.midbottom = old_midbottom
 
 class Bullet(pygame.sprite.Sprite):
-    def __int__(self, x, y, direction):
-        super.__init__(self)
+    def __init__(self, x, y, direction):
+        super().__init__()
         bullet = pygame.image.load(r"assets/bullet.png").convert_alpha()
         bullet = pygame.transform.scale_by(bullet, 1.2)
 
