@@ -47,8 +47,6 @@ class Game:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
  
-                # Press SPACE to go to next scene (temporary for testing — jumps
-                # straight to Scene 3 so it can be tested standalone)
                 if event.key == pygame.K_SPACE:
                     if self.current_scene == 0 :
                         self.current_scene = 3
