@@ -195,7 +195,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.right = SCREEN_WIDTH
 
         if keys[pygame.K_SPACE] and self.onGround:
-            self.velocityY = -30
+            self.velocityY = -15
             self.onGround = False
 
         # Apply gravity
