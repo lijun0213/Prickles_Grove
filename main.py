@@ -17,12 +17,24 @@ class Game:
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock  = pygame.time.Clock()
 
+        # Crosshair cursor, since aiming is mouse-based (fits the quill-shooting).
+        try:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_CROSSHAIR)
+        except pygame.error:
+            pass  # some environments (e.g. headless) don't support system cursors
+
         self.current_scene = 0  # 0 = main menu, 1-4 = scenes
         self.running = True
 
         self.blink_timer = 0
         self.blink_show  = True
- 
+
+        # Debug: shows the mouse's current pixel coordinate on screen.
+        # Handy for reading off x/y values when placing platforms etc.
+        # Toggle with F1.
+        self.showDebugCoords = True
+        self.debugFont = pygame.font.SysFont("Consolas", 16)
+
     # Main loop
     def run(self):
         while self.running:
@@ -46,7 +58,10 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
- 
+
+                if event.key == pygame.K_F1:
+                    self.showDebugCoords = not self.showDebugCoords
+
                 if event.key == pygame.K_SPACE:
                     if self.current_scene == 0 :
                         self.current_scene = 3
@@ -70,8 +85,27 @@ class Game:
             self.draw_main_menu()
         elif self.current_scene != 0 and self.scene:
             self.scene.draw(self.screen)
- 
+
+        if self.showDebugCoords:
+            self.draw_debug_coords()
+
         pygame.display.flip()
+
+    # Shows "(x, y)" next to the cursor — read pixel coordinates straight
+    # off the screen when placing platforms/obstacles. Toggle with F1.
+    def draw_debug_coords(self):
+        mouseX, mouseY = pygame.mouse.get_pos()
+        label = self.debugFont.render(f"({mouseX}, {mouseY})", True, WHITE, BLACK)
+
+        labelX = mouseX + 14
+        labelY = mouseY + 14
+        # Keep the label on-screen if the cursor is near the right/bottom edge
+        if labelX + label.get_width() > SCREEN_WIDTH:
+            labelX = mouseX - 14 - label.get_width()
+        if labelY + label.get_height() > SCREEN_HEIGHT:
+            labelY = mouseY - 14 - label.get_height()
+
+        self.screen.blit(label, (labelX, labelY))
 
     # Main Menu screen
     def draw_main_menu(self):

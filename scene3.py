@@ -1,7 +1,7 @@
 import pygame
 from settings import *
 from player import Player
-from obstacles import Platform
+from obstacles import Platform, Wall
 
 class Scene3:
     def __init__(self):
@@ -20,8 +20,9 @@ class Scene3:
         # the screen). Increasing it reveals higher parts of the canopy.
         self.scrollY = 0
         self.maxScrollY = max(0, self.bgHeight - SCREEN_HEIGHT)
-
-        self.player = Player()
+        
+        self.bullets = pygame.sprite.Group()
+        self.player = Player(self.bullets)
 
         self.groundY = SCREEN_HEIGHT
         self.player.rect.x = 100
@@ -31,39 +32,45 @@ class Scene3:
         # Obstacles — climbing platforms. Starting with one branch jutting out
         # from the tree on the right; Prickle jumps onto it to start climbing.
         self.platforms = [
-            Platform(r"scene3_assets/branch_right.png", x=580, y=400),
+            Platform(r"scene3_assets/branch_right.png", x=240, y=300, angle=22, scale = (2.2, 1.3)),
+            Platform(r"scene3_assets/bridge.png", x=92, y=190, scale = (1.23, 1.1)),
         ]
+
+        # Invisible vertical barrier — blocks Prickle from walking past x=615
+        # in either direction. Spans the full screen height by default.
+        self.walls = [
+            Wall(x=635, top=0, bottom=SCREEN_HEIGHT),
+            Wall(x=99, top=0, bottom=290),
+        ]
+        
 
     def update(self):
         keys = pygame.key.get_pressed()
-        prevBottom = self.player.rect.bottom
-        self.player.update(keys)
-        self.handlePlatformCollisions(prevBottom)
+        prevRect = self.player.rect.copy()
+
+        # Platform sticking, walking-along-surface, and "S" drop-through are
+        # now handled generically inside Player — just hand it this scene's
+        # platforms each frame.
+        self.player.update(keys, platforms=self.platforms)
+
+        self.handleWallCollisions(prevRect)
+        self.bullets.update()
 
         # TODO: once more climbing obstacles (vines/thorned branches) are in, drive
         # self.scrollY off the player's vertical progress instead of leaving it
         # at 0, and clamp with self.maxScrollY.
 
-    def handlePlatformCollisions(self, prevBottom):
-        # Only land on a platform when falling onto it from above — ignores
-        # jumping up into it from below or brushing it from the side.
-        if self.player.velocityY < 0:
-            return
-
-        for platform in self.platforms:
-            if not self.player.rect.colliderect(platform.rect):
+    def handleWallCollisions(self, prevRect):
+        for wall in self.walls:
+            if not self.player.rect.colliderect(wall.rect):
                 continue
 
-            # Use the branch's actual pixel shape under Prickle's feet, not
-            # its full rectangular image bounds.
-            surfaceY = platform.topAt(self.player.rect.centerx)
-            if surfaceY is None:
-                continue
-
-            if prevBottom <= surfaceY and self.player.rect.bottom >= surfaceY:
-                self.player.rect.bottom = surfaceY
-                self.player.velocityY = 0
-                self.player.onGround = True
+            # Use last frame's position to tell which side Prickle approached
+            # from, then clamp him back to that side of the wall.
+            if prevRect.right <= wall.x:
+                self.player.rect.right = wall.x
+            elif prevRect.left >= wall.x:
+                self.player.rect.left = wall.x
 
     def draw(self, screen):
         # Anchor the bottom of the background to the bottom of the screen,
@@ -75,3 +82,5 @@ class Scene3:
             platform.draw(screen)
 
         screen.blit(self.player.image, self.player.rect)
+        self.bullets.draw(screen)
+        self.player.drawAmmo(screen)
