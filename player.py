@@ -5,7 +5,7 @@ pygame.init()
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, bulletGroup):
+    def __init__(self, bulletGroup, bgWidth):
         super().__init__()
 
         # Prickle sprite sheet
@@ -21,6 +21,8 @@ class Player(pygame.sprite.Sprite):
         prickleHurt = pygame.transform.scale_by(prickleHurt, 1.2)
 
         self.bulletGroup = bulletGroup
+
+        self.bgWidth = bgWidth
 
         self.player_hpFull = pygame.image.load(r"assets/player_hpFull.png").convert_alpha()
         self.player_hpFull = pygame.transform.scale_by(self.player_hpFull, 0.35)
@@ -216,8 +218,8 @@ class Player(pygame.sprite.Sprite):
         # Keep Prickle inside the screen horizontally
         if self.rect.left < 0:
             self.rect.left = 0
-        elif self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH
+        elif self.rect.right > self.bgWidth:
+            self.rect.right = self.bgWidth
 
         if keys[pygame.K_SPACE] and self.onGround:
             self.velocityY = -15

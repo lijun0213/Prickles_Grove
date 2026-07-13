@@ -78,6 +78,7 @@ class Enemy(pygame.sprite.Sprite):
         self.wanderChangeRate = 90  # frames before picking a new random spot even if not reached
  
         self.detectRange = 250
+        self.attackRange = 60
         self.isAttacking = False
         self.attackTimer = 0        
         self.attackCooldownMax = 90   # ~1.5s between attacks
@@ -142,7 +143,7 @@ class Enemy(pygame.sprite.Sprite):
 
             if distance <= self.detectRange:
 
-                if distance <= 60:
+                if distance <= self.attackRange:
                     self.onTouchPlayer(player)
 
                 else:
@@ -166,11 +167,11 @@ class Enemy(pygame.sprite.Sprite):
 
     def onTouchPlayer(self, player):
         if self.attackCooldown == 0 and not self.isHurt:
-            player.takeDamage(self.attackDamage)
             self.isAttacking = True
             self.attackTimer = len(self.attackRFrames) * self.animSpeed
+            player.takeDamage(self.attackDamage)
             self.attackCooldown = self.attackCooldownMax
-
+    
     def animate(self):
         if self.isHurt:
             newFrames = self.hurtRFrames if self.facingRight else self.hurtLFrames
