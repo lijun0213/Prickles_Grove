@@ -24,6 +24,12 @@ class Platform(pygame.sprite.Sprite):
 
         self.rect = self.image.get_rect(topleft=(x, y))
 
+        # Resting y position (before any camera scroll is applied). A scene
+        # with a scrolling camera can shift rect.y by its scrollY each frame
+        # to keep the platform anchored to the background art; baseY is what
+        # that shift should be measured from.
+        self.baseY = self.rect.y
+
         mask = pygame.mask.from_surface(self.image)
         width, height = self.image.get_size()
 
@@ -56,6 +62,7 @@ class Wall:
     def __init__(self, x, top, bottom):
         self.x = x
         self.rect = pygame.Rect(x, top, 1, bottom - top)
+        self.baseY = self.rect.y  # see Platform.baseY
 
     def draw(self, screen):
         pass

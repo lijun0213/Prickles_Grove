@@ -99,18 +99,11 @@ class Player(pygame.sprite.Sprite):
         self.reloadRate = 120
         self.mousePressed = False
 
-        # Platform state — shared by any scene that passes a `platforms` list
-        # into update(). Lets Prickle jump onto elevated obstacles (branches,
-        # bridges, etc.), walk along their actual pixel shape, and drop
-        # through them with "S", without each scene reimplementing it.
+        #Track which platform Prickle is currently standing on.
         self.currentPlatform = None
         self.dropThroughPlatform = None
         self.dropThroughTimer = 0
         self.dropThroughFrames = 20  # frames to ignore a platform after dropping through it
-
-        # Prickle's sprite has some transparent padding below his feet, so
-        # landing exactly on a platform's pixel surface leaves a visible gap.
-        # Sink him down a few px to close it up.
         self.platformLandingOffset = 8
 
     def update(self, keys, platforms=None):
@@ -138,19 +131,11 @@ class Player(pygame.sprite.Sprite):
         self.animate(keys)
 
     def handlePlatforms(self, platforms, prevBottom, wasGrounded):
-        """Jump-on-top collision against a scene's `platforms` list (see
-        obstacles.Platform). Uses each platform's actual pixel shape, not
-        its full rectangular bounds."""
-
-        # Rising (jumping) — don't stick to anything overhead.
         if self.velocityY < 0:
             self.currentPlatform = None
             return
 
-        # First, try to stay on the specific platform we were already
-        # standing on — this is what lets walking across an uneven/sagging
-        # surface (like a rope bridge) feel continuous without needing a
-        # fresh "falling from above" every frame.
+        # If we were grounded last frame, check if we're still on the same platform.
         if wasGrounded and self.currentPlatform is not None:
             platform = self.currentPlatform
             if self.rect.colliderect(platform.rect):
@@ -160,15 +145,9 @@ class Player(pygame.sprite.Sprite):
                     self.velocityY = 0
                     self.onGround = True
                     return
-            # Walked off the platform we were on (past its solid columns,
-            # or off its box entirely) — fall through to check for a fresh
-            # landing on something else below.
             self.currentPlatform = None
 
-        # Otherwise, only land if genuinely falling onto a platform from
-        # above. This also prevents snapping sideways into a platform
-        # whenever bounding boxes happen to overlap (e.g. a rotated/scaled
-        # platform's box stretching under another one).
+        # Check for landing on any platform.
         for platform in platforms:
             if platform is self.dropThroughPlatform:
                 continue
@@ -216,7 +195,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.right = SCREEN_WIDTH
 
         if keys[pygame.K_SPACE] and self.onGround:
-            self.velocityY = -15
+            self.velocityY = -30
             self.onGround = False
 
         # Apply gravity

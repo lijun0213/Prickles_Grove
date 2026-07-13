@@ -42,7 +42,11 @@ class Scene3:
             Wall(x=635, top=0, bottom=SCREEN_HEIGHT),
             Wall(x=99, top=0, bottom=290),
         ]
-        
+
+        # Once Prickle climbs above this screen-y, the camera starts
+        # following him upward instead of letting him keep climbing off the
+        # top of the screen.
+        self.cameraFollowY = 175
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -54,11 +58,29 @@ class Scene3:
         self.player.update(keys, platforms=self.platforms)
 
         self.handleWallCollisions(prevRect)
+        self.updateCamera()
         self.bullets.update()
 
-        # TODO: once more climbing obstacles (vines/thorned branches) are in, drive
-        # self.scrollY off the player's vertical progress instead of leaving it
-        # at 0, and clamp with self.maxScrollY.
+    def updateCamera(self):
+        # How far above the follow-line Prickle is trying to be this frame
+        # (positive = above it). Feeding this into scrollY and then pinning
+        # him back at the line is what makes the camera "follow" him: his
+        # extra upward movement gets absorbed into scrolling the world
+        # instead of moving him further up the screen.
+        overshoot = self.cameraFollowY - self.player.rect.top
+        self.scrollY = max(0, min(self.maxScrollY, self.scrollY + overshoot))
+
+        if self.scrollY > 0:
+            self.player.rect.top = self.cameraFollowY
+
+        # Keep platforms/walls anchored to the background art as it scrolls,
+        # so they don't visually drift away from wherever they're drawn on
+        # the canopy (e.g. a branch scrolling down and off-screen once
+        # Prickle has climbed past it).
+        for platform in self.platforms:
+            platform.rect.y = platform.baseY + self.scrollY
+        for wall in self.walls:
+            wall.rect.y = wall.baseY + self.scrollY
 
     def handleWallCollisions(self, prevRect):
         for wall in self.walls:
