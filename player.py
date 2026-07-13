@@ -17,12 +17,18 @@ class Player(pygame.sprite.Sprite):
         prickleRun = pygame.transform.scale_by(prickleRun, 1.2)
         prickleAttack= pygame.image.load(r"assets/prickle_attack.png").convert_alpha()
         prickleAttack = pygame.transform.scale_by(prickleAttack, 1.2)
+        prickleHurt= pygame.image.load(r"assets/prickle_hurt.png").convert_alpha()
+        prickleHurt = pygame.transform.scale_by(prickleHurt, 1.2)
 
         self.bulletGroup = bulletGroup
 
+        self.player_hpFull = pygame.image.load(r"assets/player_hpFull.png").convert_alpha()
+        self.player_hpFull = pygame.transform.scale_by(self.player_hpFull, 0.35)
+        self.player_hpEmpty = pygame.image.load(r"assets/player_hpEmpty.png").convert_alpha()
+        self.player_hpEmpty = pygame.transform.scale_by(self.player_hpEmpty, 0.35)
+
         self.ammoFull = pygame.image.load(r"assets/ammo_full.png").convert_alpha()
         self.ammoFull = pygame.transform.scale_by(self.ammoFull, 0.6)
-
         self.ammoEmpty = pygame.image.load(r"assets/ammo_empty.png").convert_alpha()
         self.ammoEmpty = pygame.transform.scale_by(self.ammoEmpty, 0.6)
 
@@ -38,27 +44,31 @@ class Player(pygame.sprite.Sprite):
                 frames.append(frame)
             return frames
 
-        prickleIdleFrames = extractFrames (prickleIdle, 6)
-        prickleIdleLFrames = [pygame.transform.flip(f, True, False) for f in prickleIdleFrames]
+        prickleIdleRFrames = extractFrames (prickleIdle, 6)
+        prickleIdleLFrames = [pygame.transform.flip(f, True, False) for f in prickleIdleRFrames]
         prickleWalkRFrames = extractFrames (prickleWalk, 6)
         prickleWalkLFrames = [pygame.transform.flip(f, True, False) for f in prickleWalkRFrames]
         prickleRunRFrames = extractFrames (prickleRun, 6)
         prickleRunLFrames = [pygame.transform.flip(f, True, False) for f in prickleRunRFrames]
         prickleAttackRFrames = extractFrames (prickleAttack, 1)
         prickleAttackLFrames = [pygame.transform.flip(f, True, False) for f in prickleAttackRFrames]
+        prickleHurtRFrames = extractFrames (prickleHurt, 3)
+        prickleHurtLFrames = [pygame.transform.flip(f, True, False) for f in prickleHurtRFrames]
 
         self.animations = {
-            'idle'       : prickleIdleFrames,
+            'idle'       : prickleIdleRFrames,
             'idle_left'  : prickleIdleLFrames,
             'walk_right' : prickleWalkRFrames,
             'walk_left'  : prickleWalkLFrames,
             'run_right' : prickleRunRFrames,
             'run_left'  : prickleRunLFrames,
             'attack_right': prickleAttackRFrames,
-            'attack_left' : prickleAttackLFrames
+            'attack_left' : prickleAttackLFrames,
+            'hurt_right': prickleHurtRFrames,
+            'hurt_left' : prickleHurtLFrames
         }
 
-        self.idleFrames = prickleIdleFrames
+        self.idleFrames = prickleIdleRFrames
         self.idleLeftFrames = prickleIdleLFrames
         self.walkingRightFrames = prickleWalkRFrames
         self.walkingLeftFrames = prickleWalkLFrames
@@ -66,6 +76,9 @@ class Player(pygame.sprite.Sprite):
         self.runningLeftFrames = prickleRunLFrames
         self.attackRightFrames = prickleAttackRFrames
         self.attackLeftFrames = prickleAttackLFrames
+        self.hurtRightFrames = prickleHurtRFrames
+        self.hurtLeftFrames = prickleHurtLFrames
+        
 
         # animation
         self.currentFrames = self.idleFrames
@@ -99,12 +112,18 @@ class Player(pygame.sprite.Sprite):
         self.reloadRate = 120
         self.mousePressed = False
 
-        #Track which platform Prickle is currently standing on.
         self.currentPlatform = None
         self.dropThroughPlatform = None
         self.dropThroughTimer = 0
         self.dropThroughFrames = 20  # frames to ignore a platform after dropping through it
         self.platformLandingOffset = 8
+
+        self.maxHP = 3
+        self.hp = self.maxHP
+
+        self.isHurt = False
+        self.hurtTimer = 0
+        self.hurtDuration = 15
 
     def update(self, keys, platforms=None):
         prevBottom = self.rect.bottom
@@ -128,6 +147,12 @@ class Player(pygame.sprite.Sprite):
 
         self.handleAmmo()
         self.handleAttack()
+
+        if self.isHurt:
+            self.hurtTimer -= 1
+            if self.hurtTimer <= 0:
+                self.isHurt = False
+
         self.animate(keys)
 
     def handlePlatforms(self, platforms, prevBottom, wasGrounded):
@@ -250,8 +275,8 @@ class Player(pygame.sprite.Sprite):
         self.bulletGroup.add(bullet)
 
     def drawAmmo(self, screen):
-        ammoX = 20
-        ammoY = 80
+        ammoX = 30
+        ammoY = 70
         spacing = 65
 
         for i in range(self.maxAmmo):
@@ -261,6 +286,26 @@ class Player(pygame.sprite.Sprite):
                 image = self.ammoEmpty
 
             screen.blit(image,(ammoX + i * spacing, ammoY))
+
+    def drawHP(self,screen):
+        hpX = 20
+        hpY = 10
+        spacing = 65
+
+        for i in range(self.maxHP):
+            if i < self.hp:
+                image = self.player_hpFull
+            else:
+                image = self.player_hpEmpty
+
+            screen.blit(image, (hpX + i * spacing, hpY))
+    
+    def takeDamage(self, damage):
+        self.hp -= damage
+
+        if self.hp <= 0:
+            self.hp = 0
+            print("Player Dead")
 
     def animate(self, keys):
         if self.direction == 1:
@@ -272,6 +317,15 @@ class Player(pygame.sprite.Sprite):
         else:
             newFrames = self.idleFrames if self.facingRight else self.idleLeftFrames
 
+        if self.isHurt:
+            newFrames = self.hurtRightFrames if self.facingRight else self.hurtLeftFrames
+        elif self.direction == 1:
+            newFrames = self.runningRightFrames if self.isRunning else self.walkingRightFrames
+        elif self.direction == -1:
+            newFrames = self.runningLeftFrames if self.isRunning else self.walkingLeftFrames
+        else:
+            newFrames = self.idleFrames if self.facingRight else self.idleLeftFrames
+ 
         if self.isAttacking:
             newFrames = self.attackRightFrames if self.facingRight else self.attackLeftFrames
 
@@ -315,3 +369,5 @@ class Bullet(pygame.sprite.Sprite):
         self.life -= 1
         if self.life <= 0:
             self.kill()
+
+    
