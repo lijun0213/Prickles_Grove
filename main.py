@@ -66,6 +66,7 @@ class Game:
                     if self.current_scene == 0 :
                         self.current_scene = 1
                         self.scene = Scene1()
+                
 
     # Update game logic
     def update(self):

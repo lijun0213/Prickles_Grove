@@ -12,17 +12,19 @@ class Scene3:
         self.bg = pygame.transform.scale(self.bg, (SCREEN_WIDTH, int(bgHeight * scale)))
         self.bgHeight = self.bg.get_height()
 
-        # Camera scroll — how far the background has been shifted up to follow
-        self.scrollY = 0
-        self.maxScrollY = max(0, self.bgHeight - SCREEN_HEIGHT)
-        
         self.bullets = pygame.sprite.Group()
-        self.player = Player(self.bullets)
+        self.player = Player(self.bullets, self.bg.get_width(), self.bgHeight)
 
         self.groundY = SCREEN_HEIGHT
         self.player.rect.x = 100
         self.player.rect.bottom = self.groundY
         self.player.groundY = self.groundY
+
+        # Once Prickle climbs above this screen-y, the camera starts
+        # following him upward instead of letting him keep climbing off the
+        # top of the screen. (Camera-follow itself now lives in Player —
+        # see Player.updateCamera — this just opts this scene into it.)
+        self.player.cameraFollowY = 175
 
         # Obstacles — climbing platforms. Starting with one branch jutting out
         # from the tree on the right; Prickle jumps onto it to start climbing.
@@ -38,37 +40,25 @@ class Scene3:
             Wall(x=99, top=0, bottom=290),
         ]
 
-        # Once Prickle climbs above this screen-y, the camera starts
-        # following him upward instead of letting him keep climbing off the
-        # top of the screen.
-        self.cameraFollowY = 175
-
     def update(self):
         keys = pygame.key.get_pressed()
         prevRect = self.player.rect.copy()
 
-        # Platform sticking, walking-along-surface, and "S" drop-through are
-        # now handled generically inside Player — just hand it this scene's
-        # platforms each frame.
+        # Platform sticking, walking-along-surface, "S" drop-through, and
+        # camera-follow are all handled generically inside Player now — just
+        # hand it this scene's platforms each frame.
         self.player.update(keys, platforms=self.platforms)
 
         self.handleWallCollisions(prevRect)
-        self.updateCamera()
-        self.bullets.update()
 
-    def updateCamera(self):
-
-        overshoot = self.cameraFollowY - self.player.rect.top
-        self.scrollY = max(0, min(self.maxScrollY, self.scrollY + overshoot))
-
-        if self.scrollY > 0:
-            self.player.rect.top = self.cameraFollowY
-
-        # Keep platforms/walls anchored to the background art as it scrolls,
+        # Keep platforms/walls anchored to the background art as the camera
+        # scrolls (Player owns scrollY; this scene just reacts to it).
         for platform in self.platforms:
-            platform.rect.y = platform.baseY + self.scrollY
+            platform.rect.y = platform.baseY + self.player.scrollY
         for wall in self.walls:
-            wall.rect.y = wall.baseY + self.scrollY
+            wall.rect.y = wall.baseY + self.player.scrollY
+
+        self.bullets.update()
 
     def handleWallCollisions(self, prevRect):
         for wall in self.walls:
@@ -85,7 +75,7 @@ class Scene3:
     def draw(self, screen):
         # Anchor the bottom of the background to the bottom of the screen,
         # then shift up by scrollY as Prickle climbs.
-        bgY = SCREEN_HEIGHT - self.bgHeight + self.scrollY
+        bgY = SCREEN_HEIGHT - self.bgHeight + self.player.scrollY
         screen.blit(self.bg, (0, bgY))
 
         for platform in self.platforms:

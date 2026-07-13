@@ -1,11 +1,11 @@
 import pygame
-from settings import SCREEN_WIDTH
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT
 
 pygame.init()
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, bulletGroup, bgWidth):
+    def __init__(self, bulletGroup, bgWidth, bgHeight=None):
         super().__init__()
 
         # Prickle sprite sheet
@@ -23,6 +23,12 @@ class Player(pygame.sprite.Sprite):
         self.bulletGroup = bulletGroup
 
         self.bgWidth = bgWidth
+
+        # bgHeight is optional — scenes with a background no taller than the
+        # screen (no vertical scrolling) can just omit it. When it IS taller,
+        # this is what lets the camera-follow below know how much room there
+        # is to scroll into.
+        self.bgHeight = bgHeight if bgHeight is not None else SCREEN_HEIGHT
 
         self.player_hpFull = pygame.image.load(r"assets/player_hpFull.png").convert_alpha()
         self.player_hpFull = pygame.transform.scale_by(self.player_hpFull, 0.35)
@@ -127,6 +133,18 @@ class Player(pygame.sprite.Sprite):
         self.hurtTimer = 0
         self.hurtDuration = 15
 
+        # Vertical camera-follow (mirrors how bgWidth bounds horizontal
+        # movement). scrollY is how far the world has scrolled to keep
+        # Prickle on screen; maxScrollY is how far it CAN scroll before
+        # running out of background. cameraFollowY is the screen-y that,
+        # once crossed, starts pulling the camera up with him — it defaults
+        # to "never" (SCREEN_HEIGHT) since most scenes don't scroll; a scene
+        # that wants this can set self.player.cameraFollowY after construction,
+        # same way scenes already set self.player.groundY.
+        self.scrollY = 0
+        self.maxScrollY = max(0, self.bgHeight - SCREEN_HEIGHT)
+        self.cameraFollowY = SCREEN_HEIGHT
+
     def update(self, keys, platforms=None):
         prevBottom = self.rect.bottom
         wasGrounded = self.onGround
@@ -147,6 +165,8 @@ class Player(pygame.sprite.Sprite):
             if self.dropThroughTimer == 0:
                 self.dropThroughPlatform = None
 
+        self.updateCamera()
+
         self.handleAmmo()
         self.handleAttack()
 
@@ -156,6 +176,19 @@ class Player(pygame.sprite.Sprite):
                 self.isHurt = False
 
         self.animate(keys)
+
+    def updateCamera(self):
+        # How far above the follow-line Prickle is trying to be (positive =
+        # above it). Feeding this into scrollY and pinning him back at the
+        # line is what makes the camera "follow" him: extra upward movement
+        # gets absorbed into scrolling the world instead of moving him
+        # further up the screen. No-op whenever maxScrollY is 0 (the default,
+        # for scenes that never passed a bgHeight taller than the screen).
+        overshoot = self.cameraFollowY - self.rect.top
+        self.scrollY = max(0, min(self.maxScrollY, self.scrollY + overshoot))
+
+        if self.scrollY > 0:
+            self.rect.top = self.cameraFollowY
 
     def handlePlatforms(self, platforms, prevBottom, wasGrounded):
         if self.velocityY < 0:
@@ -204,12 +237,12 @@ class Player(pygame.sprite.Sprite):
 
         if keys[pygame.K_a]:
             self.rect.x -= self.speed
-            self.direction = -1
+            self.direction = -5
             self.facingRight = False
 
         elif keys[pygame.K_d]:
             self.rect.x += self.speed
-            self.direction = 1
+            self.direction = 5
             self.facingRight = True          
 
         else:
