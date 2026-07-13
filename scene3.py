@@ -6,18 +6,13 @@ from obstacles import Platform, Wall
 class Scene3:
     def __init__(self):
 
-        # Background — the canopy image is taller than the screen on purpose,
-        # since the fight climbs upward through the trees. We scale it to the
-        # screen width and keep its full height so it can be scrolled later.
         self.bg = pygame.image.load(r"scene3_assets/scene 3 background.jpg").convert()
         bgWidth, bgHeight = self.bg.get_size()
         scale = SCREEN_WIDTH / bgWidth
         self.bg = pygame.transform.scale(self.bg, (SCREEN_WIDTH, int(bgHeight * scale)))
         self.bgHeight = self.bg.get_height()
 
-        # scrollY = how far the camera has climbed up from the bottom of the canopy.
-        # 0 = start of the climb (bottom of the image lines up with the bottom of
-        # the screen). Increasing it reveals higher parts of the canopy.
+        # Camera scroll — how far the background has been shifted up to follow
         self.scrollY = 0
         self.maxScrollY = max(0, self.bgHeight - SCREEN_HEIGHT)
         
@@ -62,11 +57,7 @@ class Scene3:
         self.bullets.update()
 
     def updateCamera(self):
-        # How far above the follow-line Prickle is trying to be this frame
-        # (positive = above it). Feeding this into scrollY and then pinning
-        # him back at the line is what makes the camera "follow" him: his
-        # extra upward movement gets absorbed into scrolling the world
-        # instead of moving him further up the screen.
+
         overshoot = self.cameraFollowY - self.player.rect.top
         self.scrollY = max(0, min(self.maxScrollY, self.scrollY + overshoot))
 
@@ -74,9 +65,6 @@ class Scene3:
             self.player.rect.top = self.cameraFollowY
 
         # Keep platforms/walls anchored to the background art as it scrolls,
-        # so they don't visually drift away from wherever they're drawn on
-        # the canopy (e.g. a branch scrolling down and off-screen once
-        # Prickle has climbed past it).
         for platform in self.platforms:
             platform.rect.y = platform.baseY + self.scrollY
         for wall in self.walls:
