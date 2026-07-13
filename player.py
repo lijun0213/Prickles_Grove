@@ -237,13 +237,13 @@ class Player(pygame.sprite.Sprite):
 
         if keys[pygame.K_a]:
             self.rect.x -= self.speed
-            self.direction = -5
+            self.direction = -1
             self.facingRight = False
 
         elif keys[pygame.K_d]:
             self.rect.x += self.speed
-            self.direction = 5
-            self.facingRight = True          
+            self.direction = 1
+            self.facingRight = True
 
         else:
             self.direction = 0

@@ -64,8 +64,8 @@ class Game:
 
                 if event.key == pygame.K_SPACE:
                     if self.current_scene == 0 :
-                        self.current_scene = 1
-                        self.scene = Scene1()
+                        self.current_scene = 3
+                        self.scene = Scene3()
                 
 
     # Update game logic

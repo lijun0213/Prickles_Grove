@@ -31,13 +31,16 @@ class Scene3:
         self.platforms = [
             Platform(r"scene3_assets/branch_right.png", x=240, y=300, angle=22, scale = (2.2, 1.3)),
             Platform(r"scene3_assets/bridge.png", x=92, y=190, scale = (1.23, 1.1)),
+            Platform(r"scene3_assets/branch_left.png", x=75, y=70, angle=22, scale = (1.7, 1.3)),
+            Platform(r"scene3_assets/branch_right.png", x=360, y=-50, angle=22, scale = (1.5, 1.3)),
+            
         ]
 
         # Invisible vertical barrier — blocks Prickle from walking past x=615
         # in either direction. Spans the full screen height by default.
         self.walls = [
-            Wall(x=635, top=0, bottom=SCREEN_HEIGHT),
-            Wall(x=99, top=0, bottom=290),
+            Wall(x=635, top=-1000, bottom=SCREEN_HEIGHT),
+            Wall(x=99, top=-1000, bottom=290),
         ]
 
     def update(self):
