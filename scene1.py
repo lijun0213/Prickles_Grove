@@ -1,7 +1,8 @@
 import pygame
 from settings import *
 from player import Player, Bullet
-from enemies import Enemy
+from enemies import Raccoon
+from obstacles import Platform
 
 class Scene1:
     def __init__(self):
@@ -22,23 +23,28 @@ class Scene1:
         self.player = Player(self.bullets, self.bgWidth)
         self.player.bgWidth = self.bgWidth
 
-        self.groundY = 500
+        self.groundY = 490
         self.player.rect.x = 100
         self.player.rect.bottom = self.groundY
+        self.player.groundY = self.groundY
 
-        self.enemies.add(
-            Enemy(500, self.groundY),
-            Enemy(800, self.groundY),
-            Enemy(1200, self.groundY),
-            # Enemy(1500, self.groundY)
-        )
+        self.enemies.add(Raccoon(700, self.groundY))
+
+        # platforms
+        self.platforms = [
+            Platform(r"scene1_assets/chair.png", x=380, y=380, scale=(1.2)),
+            Platform(r"scene1_assets/chair.png", x=780, y=375, scale=(1.2)),
+            Platform(r"scene1_assets/chair.png", x=975, y=375, scale=(1.1)),
+            Platform(r"scene1_assets/table.png", x=492, y=355, scale=(1.1)),
+            Platform(r"scene1_assets/bed.png", x=1090, y=320, scale=(1.1))
+
+            ]
 
     def update(self):
+        keys = pygame.key.get_pressed()
+        self.player.update(keys, platforms=self.platforms)
         self.cameraX = self.player.rect.centerx - SCREEN_WIDTH // 2
         self.cameraX = max(0,min(self.cameraX, self.bgWidth - SCREEN_WIDTH))
-       
-        keys = pygame.key.get_pressed()
-        self.player.update(keys)
         self.bullets.update()
         self.enemies.update(self.player)
         for bullet in self.bullets:
@@ -50,6 +56,8 @@ class Scene1:
 
     def draw(self, screen):
         screen.blit(self.bg, (-self.cameraX, 0))        
+        for platform in self.platforms:
+            screen.blit(platform.image,(platform.rect.x - self.cameraX,platform.rect.y))
         for enemy in self.enemies:
             screen.blit(enemy.image,(enemy.rect.x - self.cameraX, enemy.rect.y))
         screen.blit(self.player.image,(self.player.rect.x - self.cameraX,self.player.rect.y))
