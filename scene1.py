@@ -103,7 +103,7 @@ class Scene1:
 
         # background music
         pygame.mixer.music.load(r"scene1_assets/scene1_bgmusic.mp3")
-        pygame.mixer.music.set_volume(0.8) 
+        pygame.mixer.music.set_volume(0.2) 
         pygame.mixer.music.play(loops=-1)
 
     def update(self):
@@ -302,8 +302,6 @@ class Scene1:
  
         for quill in self.quillGroup:
             screen.blit(quill.image, (quill.rect.x - self.cameraX, quill.rect.y))
- 
-        self.quillGroup.draw(screen)
 
         # Draw standard user interface over context surfaces
         self.player.drawAmmo(screen)
