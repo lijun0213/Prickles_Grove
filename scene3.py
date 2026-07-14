@@ -33,7 +33,7 @@ class Scene3:
             Platform(r"scene3_assets/branch_left.png", x=75, y=70, angle=22, scale = (1.7, 1.3)),
             Platform(r"scene3_assets/branch_right.png", x=360, y=-50, angle=22, scale = (1.5, 1.3)),
             Platform(r"scene3_assets/branch_left.png", x=75, y=-155, angle=-22, scale = (1.7, 1.3)),
-            Mushroom(r"scene3_assets/bouncy mushroom.png", x=80, y=-210, bounceForce=17.5, angle=-20),
+            Mushroom(r"scene3_assets/bouncy mushroom.png", x=80, y=-210, bounceForce=20, angle=-30),
             Platform(r"scene3_assets/spiky branch.png", x=360, y=-185, angle=22, scale = (1.5, 1.3)),
         ]
 

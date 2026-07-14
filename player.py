@@ -189,16 +189,26 @@ class Player(pygame.sprite.Sprite):
 
     def updateCamera(self):
         # How far above the follow-line Prickle is trying to be (positive =
-        # above it). Feeding this into scrollY and pinning him back at the
-        # line is what makes the camera "follow" him: extra upward movement
-        # gets absorbed into scrolling the world instead of moving him
-        # further up the screen. No-op whenever maxScrollY is 0 (the default,
-        # for scenes that never passed a bgHeight taller than the screen).
+        # above it). That overshoot gets absorbed into scrollY (shifting the
+        # world down instead of him up) — but only up to however much
+        # background is left to scroll. Once scrollY hits maxScrollY there's
+        # no more room to absorb, so any further climb has to actually raise
+        # him further up the screen instead of being silently discarded
+        # (discarding it is what caused the "invisible ceiling" bug — he'd
+        # get snapped back to cameraFollowY every frame forever once the
+        # background was fully scrolled). Symmetric on the way down too: as
+        # he descends back below the line, scroll credit is given back the
+        # same way, and once scrollY hits 0 he's free to actually drop below
+        # the line on screen.
         overshoot = self.cameraFollowY - self.rect.top
-        self.scrollY = max(0, min(self.maxScrollY, self.scrollY + overshoot))
 
-        if self.scrollY > 0:
-            self.rect.top = self.cameraFollowY
+        if overshoot > 0:
+            consumed = min(overshoot, self.maxScrollY - self.scrollY)
+        else:
+            consumed = max(overshoot, -self.scrollY)
+
+        self.scrollY += consumed
+        self.rect.top += consumed
 
     def handlePlatforms(self, platforms, prevBottom, wasGrounded):
         if self.velocityY < 0:
@@ -303,7 +313,7 @@ class Player(pygame.sprite.Sprite):
             self.onGround = False
 
         # Apply gravity
-        self.velocityY += 1
+        self.velocityY += 0.87
         self.rect.y += self.velocityY
 
         if self.rect.bottom >= self.groundY:
@@ -445,7 +455,7 @@ class Quill(pygame.sprite.Sprite):
         self.startY = float(y)
 
         # Maximum shooting range
-        self.maxRange = 300
+        self.maxRange = 500
 
         self.rect = self.image.get_rect(center=(x,y))
 
