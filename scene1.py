@@ -103,7 +103,7 @@ class Scene1:
 
         # background music
         pygame.mixer.music.load(r"scene1_assets/scene1_bgmusic.mp3")
-        pygame.mixer.music.set_volume(0.3) 
+        pygame.mixer.music.set_volume(0.8) 
         pygame.mixer.music.play(loops=-1)
 
     def update(self):
@@ -189,6 +189,7 @@ class Scene1:
             hits = pygame.sprite.spritecollide(quill, self.enemies, False)
             for enemy in hits:
                 enemy.takeDamage(1)
+                effects.create_impact_burst(quill.rect.center)
                 quill.kill()
 
         # First shot fired — pop a small callout next to the ammo HUD
@@ -272,6 +273,17 @@ class Scene1:
 
             effects.drawDoorGlow(screen,rect,self.doorGlowTimer)
 
+        # Draw Enemy Hurt
+        for enemy in self.enemies:
+            if hasattr(enemy, 'flash_timer') and enemy.flash_timer > 0:
+                # Create a temporary surface to match the enemy image shape
+                flash_surf = enemy.image.copy()
+                # Tint the surface bright red/pink
+                flash_surf.fill((255, 50, 50, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                screen.blit(flash_surf, (enemy.rect.x - self.cameraX, enemy.rect.y))
+            else:
+                screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
+
         # Draw characters & group assets
         for enemy in self.enemies:
             screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
@@ -298,6 +310,8 @@ class Scene1:
         self.player.drawHP(screen)
         for enemy in self.enemies:
             enemy.drawHP(screen)
+
+        effects.update_and_draw_particles(screen, self.cameraX)
  
         if self.showPopup:
             self.drawPopup(screen)

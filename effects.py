@@ -1,7 +1,37 @@
-import math
 import pygame
+import math
+import random
 from settings import WHITE, SCREEN_WIDTH, SCREEN_HEIGHT
 
+impact_particles = []
+
+def create_impact_burst(pos):
+    """Generates sparks that fly out from the impact point."""
+    for _ in range(8):
+        impact_particles.append({
+            "x": pos[0],
+            "y": pos[1],
+            "vx": random.uniform(-4, 4),
+            "vy": random.uniform(-6, -2),
+            "radius": random.randint(3, 5),
+            "life": random.randint(10, 20)
+        })
+
+def update_and_draw_particles(screen, camera_x):
+    """Updates and draws active particles relative to camera coordinate space."""
+    for p in impact_particles[:]:
+        p["x"] += p["vx"]
+        p["y"] += p["vy"]
+        p["vy"] += 0.3 # gravity pull down effect
+        p["life"] -= 1
+        
+        if p["life"] <= 0:
+            impact_particles.remove(p)
+            continue
+            
+        # Draw small sparkling circles (Yellow/Orange mix)
+        color = random.choice([(255, 220, 50), (255, 100, 30)])
+        pygame.draw.circle(screen, color, (int(p["x"] - camera_x), int(p["y"])), int(p["radius"]))
 
 def drawShatterBurst(screen, center, timer, duration, color=WHITE):
     """Radiating shard-line burst + white flash (e.g. a window breaking).
