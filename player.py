@@ -102,6 +102,13 @@ class Player(pygame.sprite.Sprite):
         self.imageOffsetY = 0
 
         self.velocityY = 0
+
+        # Passive horizontal drift — normally 0, since A/D directly set
+        # position every frame. Only used for a diagonal bounce-pad launch
+        # (see handlePlatforms): A/D still override it instantly, and it's
+        # cleared on any normal landing so the drift only lasts the one arc.
+        self.velocityX = 0
+
         self.onGround = True
         self.direction = 0
         self.facingRight = True
@@ -210,11 +217,19 @@ class Player(pygame.sprite.Sprite):
                 if surfaceY is not None:
                     self.rect.bottom = surfaceY + self.platformLandingOffset
                     self.velocityY = 0
+                    self.velocityX = 0
                     self.onGround = True
                     return
             self.currentPlatform = None
 
-        # Check for landing on any platform.
+        # Check for landing on any platform. Platform bounding boxes can
+        # overlap (a rotated/scaled branch's box can stretch across other
+        # obstacles), so rather than taking whichever platform happens to be
+        # first in the list, pick whichever valid landing is HIGHEST — the
+        # surface Prickle would actually hit first while falling.
+        bestPlatform = None
+        bestLandY = None
+
         for platform in platforms:
             if platform is self.dropThroughPlatform:
                 continue
@@ -229,12 +244,32 @@ class Player(pygame.sprite.Sprite):
             landY = surfaceY + self.platformLandingOffset
             landingFromAbove = prevBottom <= landY and self.rect.bottom >= landY
 
-            if landingFromAbove:
-                self.rect.bottom = landY
+            if landingFromAbove and (bestLandY is None or landY < bestLandY):
+                bestPlatform = platform
+                bestLandY = landY
+
+        if bestPlatform is not None:
+            bounceVY = getattr(bestPlatform, "bounceVY", None)
+
+            if bounceVY is not None:
+                # Bounce pad (e.g. Mushroom) — launch back up (and sideways,
+                # if it's rotated) instead of resting on it, and play its
+                # squash/release animation.
+                self.rect.bottom = bestLandY
+                self.velocityY = bounceVY
+                self.velocityX = getattr(bestPlatform, "bounceVX", 0)
+                self.onGround = False
+                self.currentPlatform = None
+                if hasattr(bestPlatform, "trigger"):
+                    bestPlatform.trigger()
+            else:
+                self.rect.bottom = bestLandY
                 self.velocityY = 0
+                self.velocityX = 0
                 self.onGround = True
-                self.currentPlatform = platform
-                return
+                self.currentPlatform = bestPlatform
+
+            return
 
         self.currentPlatform = None
 
@@ -244,22 +279,28 @@ class Player(pygame.sprite.Sprite):
 
         if keys[pygame.K_a]:
             self.rect.x -= self.speed
+            self.velocityX = 0  # manual input always overrides bounce drift
             self.direction = -1
             self.facingRight = False
 
         elif keys[pygame.K_d]:
             self.rect.x += self.speed
+            self.velocityX = 0
             self.direction = 1
             self.facingRight = True
 
         else:
             self.direction = 0
+            if self.velocityX:
+                self.rect.x += self.velocityX
 
         # Keep Prickle inside the screen horizontally
         if self.rect.left < 0:
             self.rect.left = 0
+            self.velocityX = 0
         elif self.rect.right > self.bgWidth:
             self.rect.right = self.bgWidth
+            self.velocityX = 0
 
         if keys[pygame.K_SPACE] and self.onGround:
             self.velocityY = -15
@@ -272,6 +313,7 @@ class Player(pygame.sprite.Sprite):
         if self.rect.bottom >= self.groundY:
             self.rect.bottom = self.groundY
             self.velocityY = 0
+            self.velocityX = 0
             self.onGround = True
         else:
             self.onGround = False
