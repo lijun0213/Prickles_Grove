@@ -87,7 +87,6 @@ class Player(pygame.sprite.Sprite):
         self.hurtRightFrames = prickleHurtRFrames
         self.hurtLeftFrames = prickleHurtLFrames
         
-
         # animation
         self.currentFrames = self.idleFrames
         self.animIndex = 0 
@@ -112,6 +111,12 @@ class Player(pygame.sprite.Sprite):
         self.onGround = True
         self.direction = 0
         self.facingRight = True
+
+        self.controllable = True
+
+        self.showAmmo = False
+        self.showCooldown = False
+        self.hasShot = False
 
         self.isRunning = False
         self.speed = 5
@@ -155,6 +160,12 @@ class Player(pygame.sprite.Sprite):
         self.cameraX = 0
         self.cameraY = 0
 
+        self.jump_sound = pygame.mixer.Sound(r"player_assets/jump_soundeffect.mp3")
+        self.jump_sound.set_volume(0.4)
+
+        self.pickupItem_sound = pygame.mixer.Sound(r"player_assets/pickup_item_sound.mp3")
+        self.pickupItem_sound.set_volume(0.4)
+
     def update(self, keys, platforms=None):
         prevBottom = self.rect.bottom
         wasGrounded = self.onGround
@@ -165,7 +176,8 @@ class Player(pygame.sprite.Sprite):
             self.dropThroughTimer = self.dropThroughFrames
             self.currentPlatform = None
 
-        self.move(keys)
+        if self.controllable:
+            self.move(keys)
 
         if platforms:
             self.handlePlatforms(platforms, prevBottom, wasGrounded)
@@ -279,7 +291,7 @@ class Player(pygame.sprite.Sprite):
             self.direction = -1
             self.facingRight = False
 
-        if keys[pygame.K_d]:
+        elif keys[pygame.K_d]:
             self.rect.x += self.speed
             self.velocityX = 0
             self.direction = 1
@@ -301,6 +313,7 @@ class Player(pygame.sprite.Sprite):
         if keys[pygame.K_SPACE] and self.onGround:
             self.velocityY = -15
             self.onGround = False
+            self.jump_sound.play()
 
         # Apply gravity
         self.velocityY += 1
@@ -327,6 +340,11 @@ class Player(pygame.sprite.Sprite):
         if fire:
             self.shoot()
             self.ammo -= 1
+
+            if not self.hasShot:
+                self.hasShot = True
+                self.showAmmo = True
+
             self.attackCooldown = self.attackCooldownMax
             self.attackTimer = 10
 
@@ -357,6 +375,9 @@ class Player(pygame.sprite.Sprite):
         self.quillGroup.add(quill)
 
     def drawAmmo(self, screen):
+        if not self.showAmmo:
+            return
+
         ammoX = 30
         ammoY = 70
         spacing = 65

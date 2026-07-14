@@ -434,19 +434,13 @@ class Raccoon(Enemy):
         self.rect = self.image.get_rect()
         self.rect.midbottom = oldMidBottom
 
+
 class EscapeEnemy(pygame.sprite.Sprite):
-
     def __init__(self, imagePath, x, y, windowX, windowY, startDelay=0, numIdleFrames=4):
-
         super().__init__()
 
         sheet = pygame.image.load(imagePath).convert_alpha()
 
-        # Slice the idle sheet into frames the same way Wasp/Raccoon/Player
-        # do — previously this loaded the WHOLE sheet as one flat image, so
-        # nothing ever animated (and if the sheet had multiple frames laid
-        # out side by side, it looked like one wide smear instead of one
-        # critter).
         frameWidth = sheet.get_width() // numIdleFrames
         frameHeight = sheet.get_height()
         self.idleFrames = [
@@ -463,9 +457,8 @@ class EscapeEnemy(pygame.sprite.Sprite):
         self.rect.x = x
         self.rect.y = y
 
-
         # movement
-        self.speed = 5
+        self.speed = 3
         self.escaping = False
         self.startDelay = startDelay  # frames to wait before moving, so a group scatters instead of moving as one block
 
@@ -475,10 +468,19 @@ class EscapeEnemy(pygame.sprite.Sprite):
 
         self.nearWindow = False
 
+        self.shrinking = False
+        self.shrinkTimer = 0
+        self.shrinkDuration = 20
+        self.shrinkStartImage = None
+
     def startEscape(self):
         self.escaping = True
 
     def update(self):
+        if self.shrinking:
+            self.updateShrink()
+            return
+        
         # Idle animation always plays — waiting or fleeing — the same way
         # Prickle keeps animating in idle/walk states.
         self.animate()
@@ -495,10 +497,25 @@ class EscapeEnemy(pygame.sprite.Sprite):
 
         # reach window
         if self.rect.x >= self.windowX:
+            self.beginShrink()
 
-            self.nearWindow = True
+    def beginShrink(self):
+        self.shrinking = True
+        self.shrinkTimer = self.shrinkDuration
+        self.shrinkStartImage = self.image
+        self.nearWindow = True
+        self.rect.center = (self.windowX, self.windowY)
 
-            # disappear after breaking window
+    def updateShrink(self):
+        self.shrinkTimer -= 1
+        progress = 1 - max(self.shrinkTimer, 0) / self.shrinkDuration  # 0 -> 1 over the shrink
+
+        scaleFactor = max(0.02, 1 - progress)
+        center = self.rect.center
+        self.image = pygame.transform.scale_by(self.shrinkStartImage, scaleFactor)
+        self.rect = self.image.get_rect(center=center)
+
+        if self.shrinkTimer <= 0:
             self.kill()
 
     def animate(self):

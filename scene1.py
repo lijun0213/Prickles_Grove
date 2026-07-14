@@ -78,7 +78,7 @@ class Scene1:
         self.popupDismissKeys = (pygame.K_SPACE, pygame.K_RETURN)
 
         # Broken Window
-        winX, winY, winScale = 800, 300, 1.0
+        winX, winY, winScale = 865, 150, 0.42
         self.windowBrokenImage = pygame.image.load(r"scene1_assets/window_broken.png").convert_alpha()
         if winScale != 1.0:
             self.windowBrokenImage = pygame.transform.scale_by(self.windowBrokenImage, winScale)
@@ -219,6 +219,7 @@ class Scene1:
 
                 if keys[pygame.K_r]:
                     self.mapCollected = True
+                    self.player.pickupItem_sound.play()
                     self.popupLines = [
                         "You found the map!",
                         "Go to Mushroom Meadow!"
