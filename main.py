@@ -67,8 +67,8 @@ class Game:
 
                 if event.key == pygame.K_SPACE:
                     if self.current_scene == 0 :
-                        self.current_scene = 1
-                        self.scene = Scene1()
+                        self.current_scene = 3
+                        self.scene = Scene3()
                 
 
     # Update game logic
@@ -97,6 +97,7 @@ class Game:
         if self.showDebugCoords:
             self.draw_debug_coords()
             self.draw_debug_keys()
+            self.draw_debug_anim()
 
         pygame.display.flip()
 
@@ -135,6 +136,37 @@ class Game:
         text = "  ".join(f"{name}:{held}" for name, held in states)
         label = self.debugFont.render(text, True, WHITE, BLACK)
         self.screen.blit(label, (10, 10))
+
+    # Live readout of Prickle's animation state — which frame set is
+    # currently playing (by name, matched against the player's known frame
+    # lists) and which frame index within it. Pinned just below the key
+    # readout. Toggle with F1. Use this to tell apart "the sprite really is
+    # stuck on one frame" (animIndex never changes / frame set never
+    # switches to RUN_LEFT) from "it's animating but the poses just look
+    # similar" (animIndex keeps advancing normally).
+    def draw_debug_anim(self):
+        if not self.scene or not hasattr(self.scene, "player"):
+            return
+
+        player = self.scene.player
+        namedSets = [
+            ("IDLE_R", player.idleFrames),
+            ("IDLE_L", player.idleLeftFrames),
+            ("WALK_R", player.walkingRightFrames),
+            ("WALK_L", player.walkingLeftFrames),
+            ("RUN_R", player.runningRightFrames),
+            ("RUN_L", player.runningLeftFrames),
+            ("ATTACK_R", player.attackRightFrames),
+            ("ATTACK_L", player.attackLeftFrames),
+            ("HURT_R", player.hurtRightFrames),
+            ("HURT_L", player.hurtLeftFrames),
+        ]
+        setName = next((name for name, frames in namedSets if frames is player.currentFrames), "?")
+
+        text = (f"anim:{setName}  frame:{player.animIndex}/{len(player.currentFrames)}  "
+                f"dir:{player.direction}  running:{player.isRunning}")
+        label = self.debugFont.render(text, True, WHITE, BLACK)
+        self.screen.blit(label, (10, 30))
 
     # Main Menu screen
     def draw_main_menu(self):
