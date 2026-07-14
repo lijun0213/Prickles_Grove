@@ -106,6 +106,12 @@ class Player(pygame.sprite.Sprite):
         self.direction = 0
         self.facingRight = True
 
+        self.controllable = True
+
+        self.showAmmo = False
+        self.showCooldown = False
+        self.hasShot = False
+
         self.isRunning = False
         self.speed = 5
 
@@ -155,7 +161,8 @@ class Player(pygame.sprite.Sprite):
             self.dropThroughTimer = self.dropThroughFrames
             self.currentPlatform = None
 
-        self.move(keys)
+        if self.controllable:
+            self.move(keys)
 
         if platforms:
             self.handlePlatforms(platforms, prevBottom, wasGrounded)
@@ -282,6 +289,11 @@ class Player(pygame.sprite.Sprite):
         if fire:
             self.shoot()
             self.ammo -= 1
+
+            if not self.hasShot:
+                self.hasShot = True
+                self.showAmmo = True
+
             self.attackCooldown = self.attackCooldownMax
             self.attackTimer = 10
 
@@ -310,6 +322,9 @@ class Player(pygame.sprite.Sprite):
         self.bulletGroup.add(bullet)
 
     def drawAmmo(self, screen):
+        if not self.showAmmo:
+            return
+
         ammoX = 30
         ammoY = 70
         spacing = 65

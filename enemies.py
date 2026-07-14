@@ -216,26 +216,23 @@ class Wasp(Enemy):
         self.rect.midbottom = oldMidBottom
 
 class Raccoon(Enemy):
-
     def __init__(self, x, y):
         super().__init__(x, y, 3)
 
         raccoonIdle = pygame.image.load(r"scene1_assets/raccoon_idle.png").convert_alpha()
-        raccoonIdle = pygame.transform.scale_by(raccoonIdle, 1.2)
+        raccoonIdle = pygame.transform.scale_by(raccoonIdle, 1.5)
         raccoonWalk = pygame.image.load(r"scene1_assets/raccoon_walk.png").convert_alpha()
-        raccoonWalk = pygame.transform.scale_by(raccoonWalk, 1.2)
+        raccoonWalk = pygame.transform.scale_by(raccoonWalk, 1.5)
         raccoonHurt = pygame.image.load(r"scene1_assets/raccoon_hurt.png").convert_alpha()
-        raccoonHurt = pygame.transform.scale_by(raccoonHurt, 1.2)
+        raccoonHurt = pygame.transform.scale_by(raccoonHurt, 1.5)
         raccoonDeath = pygame.image.load(r"scene1_assets/raccoon_death.png").convert_alpha()
-        raccoonDeath = pygame.transform.scale_by(raccoonDeath, 1.2)
+        raccoonDeath = pygame.transform.scale_by(raccoonDeath, 1.5)
 
         # Extract frames
         def extractFrames(sheet, numFrames):
             frames = []
-
             frameWidth = sheet.get_width() // numFrames
             frameHeight = sheet.get_height()
-
             for i in range(numFrames):
                 frame = sheet.subsurface(pygame.Rect(i * frameWidth, 0, frameWidth, frameHeight))
                 frames.append(frame)
@@ -263,17 +260,67 @@ class Raccoon(Enemy):
 
         self.facingRight = True
 
-        # AI
-        self.speed = 1.5
-        self.runAwayRange = 180   # start running once player is this close
-        self.groundY = y       # keep raccoon on the ground
+        # Ground / platform following — the scene sets these two after
+        # construction (Scene1 does `self.raccoon.platforms = self.platforms`
+        # and `self.raccoon.bgWidth = self.bgWidth`), the same way Player
+        # gets its platforms passed into update().
+        self.groundY = 490
+        self.platforms = []
+        self.bgWidth = None
+
+        self.normalSpeed = 1.5
+        self.escapeSpeed = 3.5
+
+        # Jump physics — same shape of logic as Player's gravity/landing code,
+        # so Nugget can land on chairs/table/bed like Prickle does.
+        self.velocityY = 0
+        self.gravity = 1
+        self.jumpPower = -14
+        self.onGround = True
+        self.currentPlatform = None
+        self.jumpChance = 0.02  # per-frame odds of a hop while fleeing, roughly once every 1-2s
+        self.idleJumpChance = 0.015  # smaller, nervier hop while just standing on the table
+
+        # Random run direction while being chased
+        self.runDirection = random.choice([-1, 1])
+        self.runDirTimer = 0
+        self.runDirChangeRate = random.randint(40, 90)
 
         self.isHurt = False
         self.hurtTimer = 0
         self.hurtDuration = 10
 
-    def update(self, player):
+        self.active = False  # stays standing still on the table until this flips True
+
+        # Dying state — plays deathRFrames/deathLFrames before removal,
+        # instead of vanishing the instant HP hits 0.
+        self.isDead = False
+        self.deathTimer = 0
+        self.deathDuration = 30  # frames the death animation holds before kill()
+
+    def activate(self):
+        # Called once the player gets close enough to trigger the chase —
+        # Nugget stops idling and starts randomly running/jumping in panic.
+        self.active = True
+
+    def takeDamage(self, damage):
+        if self.isDead:
+            return
+
+        self.hp -= damage
+        self.isHurt = True
+        self.hurtTimer = self.hurtDuration
+
         if self.hp <= 0:
+            self.hp = 0
+            self.isDead = True
+            self.deathTimer = 60
+            self.currentFrames = self.deathRFrames
+            self.animIndex = 0
+
+    def update(self, player):
+        if self.isDead:
+            self.animate()
             return
 
         if self.isHurt:
@@ -281,26 +328,89 @@ class Raccoon(Enemy):
             if self.hurtTimer <= 0:
                 self.isHurt = False
 
-        dx = self.rect.centerx - player.rect.centerx
-        dy = self.rect.centery - player.rect.centery
-        distance = max((dx ** 2 + dy ** 2) ** 0.5, 1)
-
-        if distance <= self.runAwayRange:
-            self.runAway(dx, dy, distance)
-
-        self.rect.bottom = self.groundY  # stay grounded
+        if self.active:
+            self.runAndJump()
+        # else: stays put on the table, just idles in place
 
         self.animate()
 
-    def runAway(self, dx, dy, distance):
-        # Move away from the player (opposite direction of dx, dy)
-        self.rect.x += (dx / distance) * self.speed
-        self.rect.y += (dy / distance) * self.speed
-        self.facingRight = dx > 0
+    def runAndJump(self):
+        # Pick a new random direction every so often, so movement while
+        # fleeing looks panicked rather than a straight line.
+        self.runDirTimer += 1
+        if self.runDirTimer >= self.runDirChangeRate:
+            self.runDirection = random.choice([-1, 1])
+            self.runDirTimer = 0
+            self.runDirChangeRate = random.randint(40, 90)
+
+        self.rect.x += self.runDirection * self.escapeSpeed
+        self.facingRight = self.runDirection > 0
+
+        if self.bgWidth:
+            if self.rect.left < 0:
+                self.rect.left = 0
+                self.runDirection = 1
+            elif self.rect.right > self.bgWidth:
+                self.rect.right = self.bgWidth
+                self.runDirection = -1
+
+        if self.onGround and random.random() < self.jumpChance:
+            self.velocityY = self.jumpPower
+            self.onGround = False
+            self.currentPlatform = None
+
+        self.applyGravityAndPlatforms()
+
+    def applyGravityAndPlatforms(self):
+        # Mirrors Player.handlePlatforms: land on the same platform we were
+        # already standing on if possible, otherwise check for a fresh
+        # landing, and fall back to the room's groundY floor.
+        prevBottom = self.rect.bottom
+        wasGrounded = self.onGround
+
+        self.velocityY += self.gravity
+        self.rect.y += self.velocityY
+        self.onGround = False
+
+        if self.velocityY >= 0:
+            if wasGrounded and self.currentPlatform is not None:
+                platform = self.currentPlatform
+                if self.rect.colliderect(platform.rect):
+                    surfaceY = platform.topAt(self.rect.centerx)
+                    if surfaceY is not None:
+                        self.rect.bottom = surfaceY + 8
+                        self.velocityY = 0
+                        self.onGround = True
+                        return
+                self.currentPlatform = None
+
+            for platform in self.platforms:
+                if not self.rect.colliderect(platform.rect):
+                    continue
+                surfaceY = platform.topAt(self.rect.centerx)
+                if surfaceY is None:
+                    continue
+                landY = surfaceY + 8
+                if prevBottom <= landY and self.rect.bottom >= landY:
+                    self.rect.bottom = landY
+                    self.velocityY = 0
+                    self.onGround = True
+                    self.currentPlatform = platform
+                    return
+
+        if self.rect.bottom >= self.groundY:
+            self.rect.bottom = self.groundY
+            self.velocityY = 0
+            self.onGround = True
+            self.currentPlatform = None
 
     def animate(self):
-        if self.isHurt:
+        if self.isDead:
+            newFrames = self.deathRFrames if self.facingRight else self.deathLFrames
+        elif self.isHurt:
             newFrames = self.hurtRFrames if self.facingRight else self.hurtLFrames
+        elif self.active:
+            newFrames = self.walkRFrames if self.facingRight else self.walkLFrames
         else:
             newFrames = self.idleRFrames if self.facingRight else self.idleLFrames
 
@@ -310,15 +420,91 @@ class Raccoon(Enemy):
             self.animTimer = 0
 
         self.animTimer += 1
-
         if self.animTimer >= self.animSpeed:
             self.animTimer = 0
-            self.animIndex = (self.animIndex + 1) % len(self.currentFrames)
+            if self.isDead:
+                # Hold on the last death frame instead of looping back to frame 0.
+                self.animIndex = min(self.animIndex + 1, len(self.currentFrames) - 1)
+            else:
+                self.animIndex = (self.animIndex + 1) % len(self.currentFrames)
 
         self.image = self.currentFrames[self.animIndex]
 
         oldMidBottom = self.rect.midbottom
-
         self.rect = self.image.get_rect()
-
         self.rect.midbottom = oldMidBottom
+
+class EscapeEnemy(pygame.sprite.Sprite):
+
+    def __init__(self, imagePath, x, y, windowX, windowY, startDelay=0, numIdleFrames=4):
+
+        super().__init__()
+
+        sheet = pygame.image.load(imagePath).convert_alpha()
+
+        # Slice the idle sheet into frames the same way Wasp/Raccoon/Player
+        # do — previously this loaded the WHOLE sheet as one flat image, so
+        # nothing ever animated (and if the sheet had multiple frames laid
+        # out side by side, it looked like one wide smear instead of one
+        # critter).
+        frameWidth = sheet.get_width() // numIdleFrames
+        frameHeight = sheet.get_height()
+        self.idleFrames = [
+            sheet.subsurface(pygame.Rect(i * frameWidth, 0, frameWidth, frameHeight))
+            for i in range(numIdleFrames)
+        ]
+
+        self.animIndex = 0
+        self.animTimer = 0
+        self.animSpeed = 10
+
+        self.image = self.idleFrames[0]
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+
+        # movement
+        self.speed = 5
+        self.escaping = False
+        self.startDelay = startDelay  # frames to wait before moving, so a group scatters instead of moving as one block
+
+        # window target
+        self.windowX = windowX
+        self.windowY = windowY
+
+        self.nearWindow = False
+
+    def startEscape(self):
+        self.escaping = True
+
+    def update(self):
+        # Idle animation always plays — waiting or fleeing — the same way
+        # Prickle keeps animating in idle/walk states.
+        self.animate()
+
+        if not self.escaping:
+            return
+
+        if self.startDelay > 0:
+            self.startDelay -= 1
+            return
+
+        # move right
+        self.rect.x += self.speed
+
+        # reach window
+        if self.rect.x >= self.windowX:
+
+            self.nearWindow = True
+
+            # disappear after breaking window
+            self.kill()
+
+    def animate(self):
+        self.animTimer += 1
+        if self.animTimer >= self.animSpeed:
+            self.animTimer = 0
+            self.animIndex = (self.animIndex + 1) % len(self.idleFrames)
+
+        self.image = self.idleFrames[self.animIndex]
