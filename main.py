@@ -66,8 +66,8 @@ class Game:
 
                 if event.key == pygame.K_SPACE:
                     if self.current_scene == 0 :
-                        self.current_scene = 1
-                        self.scene = Scene1()
+                        self.current_scene = 3
+                        self.scene = Scene3()
                 
 
     # Update game logic
@@ -95,6 +95,7 @@ class Game:
 
         if self.showDebugCoords:
             self.draw_debug_coords()
+            self.draw_debug_keys()
 
         pygame.display.flip()
 
@@ -113,6 +114,26 @@ class Game:
             labelY = mouseY - 14 - label.get_height()
 
         self.screen.blit(label, (labelX, labelY))
+
+    # Live readout of whether pygame itself currently sees A/D/SPACE/SHIFT
+    # as held down — pinned to the top-left corner. Toggle with F1 (same
+    # flag as the mouse coords). This is here to pin down the "movement
+    # sometimes stops working" bug: if this readout shows False while a key
+    # is physically being held, pygame/Windows never delivered the keypress
+    # to the game at all (an OS/driver/focus issue, not a bug in this code).
+    # If it shows True and Prickle still doesn't move, that means the game
+    # DID see the key and the bug is in the movement code after all.
+    def draw_debug_keys(self):
+        keys = pygame.key.get_pressed()
+        states = [
+            ("A", keys[pygame.K_a]),
+            ("D", keys[pygame.K_d]),
+            ("SPACE", keys[pygame.K_SPACE]),
+            ("SHIFT", keys[pygame.K_LSHIFT]),
+        ]
+        text = "  ".join(f"{name}:{held}" for name, held in states)
+        label = self.debugFont.render(text, True, WHITE, BLACK)
+        self.screen.blit(label, (10, 10))
 
     # Main Menu screen
     def draw_main_menu(self):
