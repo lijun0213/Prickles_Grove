@@ -435,6 +435,113 @@ class Raccoon(Enemy):
         self.rect.midbottom = oldMidBottom
 
 
+class Feathers(Enemy):
+
+    def __init__(self, x, y, hp=10, hoverOffset=150, wanderRange=150, scale=0.4):
+        super().__init__(x, y, hp)
+
+        sheet = pygame.image.load(r"feather_assets/feather_movement.png").convert_alpha()
+        sheet = pygame.transform.scale_by(sheet, scale)
+
+        def extractFrames(sheet, numFrames):
+            frames = []
+            frameWidth = sheet.get_width() // numFrames
+            frameHeight = sheet.get_height()
+            for i in range(numFrames):
+                frame = sheet.subsurface(pygame.Rect(i * frameWidth, 0, frameWidth, frameHeight))
+                frames.append(frame)
+            return frames
+
+        # feather_movement.png is a 5-frame flapping-flight loop.
+        self.flyRFrames = extractFrames(sheet, 5)
+        self.flyLFrames = [pygame.transform.flip(f, True, False) for f in self.flyRFrames]
+
+        self.currentFrames = self.flyRFrames
+        self.animIndex = 0
+        self.animTimer = 0
+        self.animSpeed = 6
+
+        self.image = self.currentFrames[0]
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.bottom = y
+
+        self.facingRight = True
+
+        # Horizontal wander — picks a random x within wanderRange of wherever
+        # it currently is, drifts toward it, then picks a new one, so it
+        # reads as "flying left and right randomly" rather than patrolling a
+        # fixed line.
+        self.speed = 2
+        self.wanderRange = wanderRange
+        self.wanderTargetX = self.rect.centerx
+        self.wanderTimer = 0
+        self.wanderChangeRate = random.randint(60, 150)
+
+        # Vertical tracking — eases toward hoverOffset px above Prickle's
+        # current on-screen position every frame. Reading player.rect
+        # directly (rather than tracking scrollY/baseY like a background
+        # platform would) means this "just works" through camera scrolling —
+        # it's always chasing wherever Prickle visibly is right now.
+        self.hoverOffset = hoverOffset
+        self.verticalSpeed = 3
+
+    def pickWanderTargetX(self):
+        margin = 40
+        low = max(margin, self.rect.centerx - self.wanderRange)
+        high = min(SCREEN_WIDTH - margin, self.rect.centerx + self.wanderRange)
+        if low >= high:
+            return self.rect.centerx
+        return random.randint(low, high)
+
+    def update(self, player):
+        if self.hp <= 0:
+            return
+
+        # Horizontal: drift toward a randomly-changing target x.
+        self.wanderTimer += 1
+        reachedTarget = abs(self.rect.centerx - self.wanderTargetX) < 6
+        if reachedTarget or self.wanderTimer >= self.wanderChangeRate:
+            self.wanderTargetX = self.pickWanderTargetX()
+            self.wanderTimer = 0
+            self.wanderChangeRate = random.randint(60, 150)
+
+        dx = self.wanderTargetX - self.rect.centerx
+        if abs(dx) > 1:
+            step = min(self.speed, abs(dx))
+            self.rect.x += step if dx > 0 else -step
+            self.facingRight = dx > 0
+
+        # Vertical: ease toward hoverOffset px above Prickle's current
+        # screen position — never snaps, so it smoothly rises as he climbs.
+        targetY = player.rect.centery - self.hoverOffset
+        dy = targetY - self.rect.centery
+        if abs(dy) > 1:
+            step = min(self.verticalSpeed, abs(dy))
+            self.rect.y += step if dy > 0 else -step
+
+        self.animate()
+
+    def animate(self):
+        newFrames = self.flyRFrames if self.facingRight else self.flyLFrames
+
+        if newFrames != self.currentFrames:
+            self.currentFrames = newFrames
+            self.animIndex = 0
+            self.animTimer = 0
+
+        self.animTimer += 1
+        if self.animTimer >= self.animSpeed:
+            self.animTimer = 0
+            self.animIndex = (self.animIndex + 1) % len(self.currentFrames)
+
+        self.image = self.currentFrames[self.animIndex]
+
+        oldMidBottom = self.rect.midbottom
+        self.rect = self.image.get_rect()
+        self.rect.midbottom = oldMidBottom
+
+
 class EscapeEnemy(pygame.sprite.Sprite):
     def __init__(self, imagePath, x, y, windowX, windowY, startDelay=0, numIdleFrames=4):
         super().__init__()

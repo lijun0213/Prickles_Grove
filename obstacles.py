@@ -11,7 +11,7 @@ class Platform(pygame.sprite.Sprite):
     feels like landing on the branch itself, not an invisible box around it.
     """
 
-    def __init__(self, imagePath, x, y, angle=0, scale=1.0):
+    def __init__(self, imagePath, x, y, angle=0, scale=1.0, blocksBullets=False):
         super().__init__()
         self.image = pygame.image.load(imagePath).convert_alpha()
 
@@ -24,23 +24,19 @@ class Platform(pygame.sprite.Sprite):
             self.image = pygame.transform.rotate(self.image, angle)
 
         self.rect = self.image.get_rect(topleft=(x, y))
+        self.blocksBullets = blocksBullets
 
-        # Resting y position (before any camera scroll is applied). A scene
-        # with a scrolling camera can shift rect.y by its scrollY each frame
-        # to keep the platform anchored to the background art; baseY is what
-        # that shift should be measured from.
         self.baseY = self.rect.y
 
-        mask = pygame.mask.from_surface(self.image)
+        self.mask = pygame.mask.from_surface(self.image)
         width, height = self.image.get_size()
 
-        # surfaceY[col] = local y of the topmost opaque pixel in that column,
-        # or None if the column is fully transparent (a gap in the shape).
+
         self.surfaceY = []
         for col in range(width):
             colY = None
             for row in range(height):
-                if mask.get_at((col, row)):
+                if self.mask.get_at((col, row)):
                     colY = row
                     break
             self.surfaceY.append(colY)
@@ -53,6 +49,13 @@ class Platform(pygame.sprite.Sprite):
         if localY is None:
             return None
         return self.rect.y + localY
+
+    def collidesRect(self, otherRect):
+        if not self.rect.colliderect(otherRect):
+            return False
+        otherMask = pygame.mask.Mask(otherRect.size, fill=True)
+        offset = (otherRect.x - self.rect.x, otherRect.y - self.rect.y)
+        return self.mask.overlap(otherMask, offset) is not None
 
     def draw(self, screen):
         screen.blit(self.image, self.rect)

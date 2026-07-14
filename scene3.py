@@ -2,6 +2,7 @@ import pygame
 from settings import *
 from player import Player
 from obstacles import Platform, Wall, Mushroom, Nest
+from enemies import Feathers
 
 class Scene3:
     def __init__(self):
@@ -33,8 +34,8 @@ class Scene3:
             Platform(r"scene3_assets/branch_left.png", x=75, y=70, angle=22, scale = (1.7, 1.3)),
             Platform(r"scene3_assets/branch_right.png", x=360, y=-50, angle=22, scale = (1.5, 1.3)),
             Platform(r"scene3_assets/branch_left.png", x=75, y=-155, angle=-22, scale = (1.7, 1.3)),
-            Mushroom(r"scene3_assets/bouncy mushroom.png", x=80, y=-210, bounceForce=20, angle=-30),
-            Platform(r"scene3_assets/spiky branch.png", x=360, y=-185, angle=22, scale = (1.5, 1.3)),
+            Mushroom(r"scene3_assets/bouncy mushroom.png", x=100, y=-220, bounceForce=20, angle=-10),
+            Platform(r"scene3_assets/spiky branch.png", x=285, y=-400, angle=-50, scale = 1, blocksBullets=True),
         ]
 
 
@@ -44,8 +45,13 @@ class Scene3:
         ]
 
         self.nests = [
-            Nest(r"scene3_assets/bird nest.png", x=550, y=-425, maxHits=5),
+            Nest(r"scene3_assets/bird nest.png", x=510, y=-425, maxHits=5),
         ]
+
+        # Feathers — the Scene 3 boss. Flies left/right randomly and hovers
+        # a fixed distance above wherever Prickle currently is, so he's
+        # always overhead as Prickle climbs toward the nest.
+        self.feathers = Feathers(x=400, y=-350, hp=10, hoverOffset=250, wanderRange=150)
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -72,13 +78,33 @@ class Scene3:
         self.bullets.update()
         self.handleBulletHits()
 
+        self.feathers.update(self.player)
+
     def handleBulletHits(self):
         for bullet in list(self.bullets):
+            hit = False
+
             for nest in self.nests:
                 if nest.destroyed:
                     continue
                 if bullet.rect.colliderect(nest.rect):
                     nest.takeHit()
+                    bullet.kill()
+                    hit = True
+                    break
+
+            if hit:
+                continue
+
+            # Bullet-blocking platforms (e.g. the spiky branch) just stop
+            # the bullet outright — no hit-tracking, they're not a target.
+            # Uses shape-accurate collision (collidesRect), not just the
+            # bounding rect, since a rotated platform's rect can be much
+            # bigger than its visible sprite.
+            for platform in self.platforms:
+                if not getattr(platform, "blocksBullets", False):
+                    continue
+                if platform.collidesRect(bullet.rect):
                     bullet.kill()
                     break
 
@@ -104,6 +130,8 @@ class Scene3:
             platform.draw(screen)
         for nest in self.nests:
             nest.draw(screen)
+
+        screen.blit(self.feathers.image, self.feathers.rect)
 
         screen.blit(self.player.image, self.player.rect)
         self.bullets.draw(screen)
