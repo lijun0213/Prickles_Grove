@@ -1,7 +1,7 @@
 import pygame
 from settings import *
 from player import Player
-from obstacles import Platform, Wall
+from obstacles import Platform, Wall, Mushroom, Nest
 
 class Scene3:
     def __init__(self):
@@ -26,21 +26,26 @@ class Scene3:
         # see Player.updateCamera — this just opts this scene into it.)
         self.player.cameraFollowY = 175
 
-        # Obstacles — climbing platforms. Starting with one branch jutting out
-        # from the tree on the right; Prickle jumps onto it to start climbing.
+
         self.platforms = [
             Platform(r"scene3_assets/branch_right.png", x=240, y=300, angle=22, scale = (2.2, 1.3)),
             Platform(r"scene3_assets/bridge.png", x=92, y=190, scale = (1.23, 1.1)),
             Platform(r"scene3_assets/branch_left.png", x=75, y=70, angle=22, scale = (1.7, 1.3)),
             Platform(r"scene3_assets/branch_right.png", x=360, y=-50, angle=22, scale = (1.5, 1.3)),
-            
+            Platform(r"scene3_assets/branch_left.png", x=75, y=-155, angle=-22, scale = (1.7, 1.3)),
+            # Bounce pad — lands like any other platform, but launches
+            # Prickle back upward instead of letting him stand on it.
+            Mushroom(r"scene3_assets/bouncy mushroom.png", x=80, y=-210, bounceForce=17.5, angle=-20),
         ]
 
-        # Invisible vertical barrier — blocks Prickle from walking past x=615
-        # in either direction. Spans the full screen height by default.
+
         self.walls = [
             Wall(x=635, top=-1000, bottom=SCREEN_HEIGHT),
-            Wall(x=99, top=-1000, bottom=290),
+            Wall(x=80, top=-1000, bottom=290),
+        ]
+
+        self.nests = [
+            Nest(r"scene3_assets/bird nest.png", x=550, y=-425, maxHits=5),
         ]
 
     def update(self):
@@ -54,14 +59,29 @@ class Scene3:
 
         self.handleWallCollisions(prevRect)
 
-        # Keep platforms/walls anchored to the background art as the camera
-        # scrolls (Player owns scrollY; this scene just reacts to it).
+        # Keep platforms/walls/nests anchored to the background art as the
+        # camera scrolls (Player owns scrollY; this scene just reacts to it).
         for platform in self.platforms:
             platform.rect.y = platform.baseY + self.player.scrollY
+            platform.update()  # advances things like the mushroom's bounce animation
         for wall in self.walls:
             wall.rect.y = wall.baseY + self.player.scrollY
+        for nest in self.nests:
+            nest.rect.y = nest.baseY + self.player.scrollY
+            nest.update()  # fades the hit-flash back to normal
 
         self.bullets.update()
+        self.handleBulletHits()
+
+    def handleBulletHits(self):
+        for bullet in list(self.bullets):
+            for nest in self.nests:
+                if nest.destroyed:
+                    continue
+                if bullet.rect.colliderect(nest.rect):
+                    nest.takeHit()
+                    bullet.kill()
+                    break
 
     def handleWallCollisions(self, prevRect):
         for wall in self.walls:
@@ -83,6 +103,8 @@ class Scene3:
 
         for platform in self.platforms:
             platform.draw(screen)
+        for nest in self.nests:
+            nest.draw(screen)
 
         screen.blit(self.player.image, self.player.rect)
         self.bullets.draw(screen)
