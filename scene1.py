@@ -1,6 +1,6 @@
 import pygame
 from settings import *
-from player import Player, Bullet
+from player import Player, Quill
 from enemies import Raccoon, EscapeEnemy
 from obstacles import Platform
 import effects
@@ -20,11 +20,11 @@ class Scene1:
 
         # Sprite Groups
         self.enemies = pygame.sprite.Group()
-        self.bullets = pygame.sprite.Group()
+        self.quillGroup = pygame.sprite.Group()
         self.escapeEnemies = pygame.sprite.Group()
 
         # Instantiate Player
-        self.player = Player(self.bullets, self.bgWidth)
+        self.player = Player(self.quillGroup, self.bgWidth)
         self.player.bgWidth = self.bgWidth
 
         # Ground setting
@@ -32,10 +32,6 @@ class Scene1:
         self.player.rect.x = 100
         self.player.rect.bottom = self.groundY
         self.player.groundY = self.groundY
-
-        # Items
-        self.hasQuill = False
-        self.quillRect = pygame.Rect(300, self.groundY - 50, 40, 40)
 
         # Platforms map structure
         self.platforms = [
@@ -104,7 +100,12 @@ class Scene1:
         self.doorRect = pygame.Rect(0, self.groundY - 140, 60, 140)
         self.doorGlowTimer = 0
         self.levelComplete = False
- 
+
+        # background music
+        pygame.mixer.music.load(r"scene1_assets/scene1_bgmusic.mp3")
+        pygame.mixer.music.set_volume(0.3) 
+        pygame.mixer.music.play(loops=-1)
+
     def update(self):
         keys = pygame.key.get_pressed()
 
@@ -113,7 +114,9 @@ class Scene1:
             self.updatePopup(keys)
             self.updateCamera()
             return
-
+        
+        self.player.update(keys, self.platforms)
+        self.quillGroup.update()
         self.enemies.update(self.player)
         self.escapeEnemies.update()
 
@@ -134,8 +137,6 @@ class Scene1:
         self.updateCamera()
 
     def updateIntro(self):
-        self.player.update(pygame.key.get_pressed(), platforms=self.platforms)
-
         # Trigger once the player walks close
         triggerRange = 300
         nearEnemy = any(
@@ -151,7 +152,6 @@ class Scene1:
  
     def updateEscape(self):
         keys = pygame.key.get_pressed()
-        self.player.update(keys, platforms=self.platforms)
 
         if not self.escapeStarted:
             self.escapeStarted = True
@@ -173,8 +173,6 @@ class Scene1:
             self.showPopup = True
  
     def updateChase(self, keys):
-        self.player.update(keys, platforms=self.platforms)
-
         # Raccoon intercepts the player
         if self.player.rect.colliderect(self.raccoon.rect.inflate(80, 50)):
             self.raccoon.activate()
@@ -186,15 +184,12 @@ class Scene1:
             self.showPopup = True
 
     def updateShoot(self):
-        self.player.update(pygame.key.get_pressed(), platforms=self.platforms)
-        self.bullets.update()
-
-        # Bullet and enemy collision processing
-        for bullet in self.bullets:
-            hits = pygame.sprite.spritecollide(bullet, self.enemies, False)
+        # Quills and enemy collision processing
+        for quill in self.quillGroup:
+            hits = pygame.sprite.spritecollide(quill, self.enemies, False)
             for enemy in hits:
                 enemy.takeDamage(1)
-                bullet.kill()
+                quill.kill()
 
         # First shot fired — pop a small callout next to the ammo HUD
         # explaining the 3-shot limit and cooldown. Doesn't change state,
@@ -215,8 +210,6 @@ class Scene1:
             self.mapRect = self.mapImage.get_rect(center=self.raccoon.rect.center)
 
     def updateMap(self, keys):
-        self.player.update(keys, platforms=self.platforms)
-
         self.nearMap = False
 
         if self.mapRect and self.player.rect.colliderect(self.mapRect):
@@ -234,10 +227,12 @@ class Scene1:
                     self.state = "EXIT"
 
     def updateExit(self):
-        self.player.update(pygame.key.get_pressed(), platforms=self.platforms)
         self.doorGlowTimer += 1
 
         if self.player.rect.colliderect(self.doorRect):
+            self.levelComplete = True
+        if self.player.rect.x <= 10:
+            pygame.mixer.music.fadeout(1000) 
             self.levelComplete = True
 
     def updatePopup(self, keys):
@@ -254,6 +249,8 @@ class Scene1:
         self.cameraX = self.player.rect.centerx - SCREEN_WIDTH // 2
         self.cameraX = max(0, min(self.cameraX, self.bgWidth - SCREEN_WIDTH))
  
+        self.player.cameraX = self.cameraX
+
     def draw(self, screen):
         # Draw parallax background
         screen.blit(self.bg, (-self.cameraX, 0))  
@@ -290,9 +287,11 @@ class Scene1:
         
         screen.blit(self.player.image, (self.player.rect.x - self.cameraX, self.player.rect.y))
  
-        for bullet in self.bullets:
-            screen.blit(bullet.image, (bullet.rect.x - self.cameraX, bullet.rect.y))
+        for quill in self.quillGroup:
+            screen.blit(quill.image, (quill.rect.x - self.cameraX, quill.rect.y))
  
+        self.quillGroup.draw(screen)
+
         # Draw standard user interface over context surfaces
         self.player.drawAmmo(screen)
         self.player.drawHP(screen)

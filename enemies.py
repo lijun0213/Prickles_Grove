@@ -14,9 +14,9 @@ class Enemy(pygame.sprite.Sprite):
         self.maxHP = hp
         self.hp = hp
 
-        self.enemy_hpFull = pygame.image.load(r"assets/enemy_hpFull.png").convert_alpha()
+        self.enemy_hpFull = pygame.image.load(r"player_assets/enemy_hpFull.png").convert_alpha()
         self.enemy_hpFull = pygame.transform.scale_by(self.enemy_hpFull, 4.5)
-        self.enemy_hpEmpty = pygame.image.load(r"assets/enemy_hpEmpty.png").convert_alpha()
+        self.enemy_hpEmpty = pygame.image.load(r"player_assets/enemy_hpEmpty.png").convert_alpha()
         self.enemy_hpEmpty = pygame.transform.scale_by(self.enemy_hpEmpty, 4.5)
 
     def takeDamage(self, damage):

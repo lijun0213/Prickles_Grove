@@ -5,22 +5,22 @@ pygame.init()
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, bulletGroup, bgWidth, bgHeight=None):
+    def __init__(self, quillGroup, bgWidth, bgHeight=None):
         super().__init__()
 
         # Prickle sprite sheet
-        prickleIdle = pygame.image.load(r"assets/prickle_idle.png").convert_alpha()
+        prickleIdle = pygame.image.load(r"player_assets/prickle_idle.png").convert_alpha()
         prickleIdle = pygame.transform.scale_by(prickleIdle, 1.2)
-        prickleWalk = pygame.image.load(r"assets/prickle_walk.png").convert_alpha()
+        prickleWalk = pygame.image.load(r"player_assets/prickle_walk.png").convert_alpha()
         prickleWalk = pygame.transform.scale_by(prickleWalk, 1.2)
-        prickleRun = pygame.image.load(r"assets/prickle_run.png").convert_alpha()
+        prickleRun = pygame.image.load(r"player_assets/prickle_run.png").convert_alpha()
         prickleRun = pygame.transform.scale_by(prickleRun, 1.2)
-        prickleAttack= pygame.image.load(r"assets/prickle_attack.png").convert_alpha()
+        prickleAttack= pygame.image.load(r"player_assets/prickle_attack.png").convert_alpha()
         prickleAttack = pygame.transform.scale_by(prickleAttack, 1.2)
-        prickleHurt= pygame.image.load(r"assets/prickle_hurt.png").convert_alpha()
+        prickleHurt= pygame.image.load(r"player_assets/prickle_hurt.png").convert_alpha()
         prickleHurt = pygame.transform.scale_by(prickleHurt, 1.2)
 
-        self.bulletGroup = bulletGroup
+        self.quillGroup = quillGroup
 
         self.bgWidth = bgWidth
 
@@ -30,14 +30,14 @@ class Player(pygame.sprite.Sprite):
         # is to scroll into.
         self.bgHeight = bgHeight if bgHeight is not None else SCREEN_HEIGHT
 
-        self.player_hpFull = pygame.image.load(r"assets/player_hpFull.png").convert_alpha()
+        self.player_hpFull = pygame.image.load(r"player_assets/player_hpFull.png").convert_alpha()
         self.player_hpFull = pygame.transform.scale_by(self.player_hpFull, 0.35)
-        self.player_hpEmpty = pygame.image.load(r"assets/player_hpEmpty.png").convert_alpha()
+        self.player_hpEmpty = pygame.image.load(r"player_assets/player_hpEmpty.png").convert_alpha()
         self.player_hpEmpty = pygame.transform.scale_by(self.player_hpEmpty, 0.35)
 
-        self.ammoFull = pygame.image.load(r"assets/ammo_full.png").convert_alpha()
+        self.ammoFull = pygame.image.load(r"player_assets/ammo_full.png").convert_alpha()
         self.ammoFull = pygame.transform.scale_by(self.ammoFull, 0.6)
-        self.ammoEmpty = pygame.image.load(r"assets/ammo_empty.png").convert_alpha()
+        self.ammoEmpty = pygame.image.load(r"player_assets/ammo_empty.png").convert_alpha()
         self.ammoEmpty = pygame.transform.scale_by(self.ammoEmpty, 0.6)
 
         # Extract frames
@@ -157,6 +157,9 @@ class Player(pygame.sprite.Sprite):
         self.scrollY = 0
         self.maxScrollY = max(0, self.bgHeight - SCREEN_HEIGHT)
         self.cameraFollowY = SCREEN_HEIGHT
+
+        self.cameraX = 0
+        self.cameraY = 0
 
     def update(self, keys, platforms=None):
         prevBottom = self.rect.bottom
@@ -357,11 +360,13 @@ class Player(pygame.sprite.Sprite):
             self.reloadTimer = 0
 
     def shoot(self):
-        direction = 1 if self.facingRight else -1
-        bulletX = self.rect.centerx + (direction * self.rect.width // 2)
-        bulletY = self.rect.centery
-        bullet = Bullet(bulletX, bulletY, direction)
-        self.bulletGroup.add(bullet)
+        mouseX, mouseY = pygame.mouse.get_pos()
+
+        # camera correction
+        mouseX += self.cameraX
+
+        quill = Quill(self.rect.centerx,self.rect.centery,mouseX,mouseY)
+        self.quillGroup.add(quill)
 
     def drawAmmo(self, screen):
         if not self.showAmmo:
@@ -440,26 +445,57 @@ class Player(pygame.sprite.Sprite):
 
         self.rect.midbottom = old_midbottom
 
-class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, direction):
+
+class Quill(pygame.sprite.Sprite):
+    def __init__(self, x, y, targetX, targetY):
         super().__init__()
-        bullet = pygame.image.load(r"assets/bullet.png").convert_alpha()
-        bullet = pygame.transform.scale_by(bullet, 1.2)
 
-        if direction == -1:
-            bullet = pygame.transform.flip(bullet, True, False)
+        self.image = pygame.image.load(r"player_assets/quill.png" ).convert_alpha()
+        self.image = pygame.transform.scale(self.image,(50,20))
 
-        self.speed = 10
-        self.image = bullet
-        self.rect = self.image.get_rect()
-        self.rect.center = (x, y)
-        self.direction = direction
-        self.life = 120
+        # Starting position
+        self.x = float(x)
+        self.y = float(y)
+        self.startX = float(x)
+        self.startY = float(y)
+
+        # Maximum shooting range
+        self.maxRange = 300
+
+        self.rect = self.image.get_rect(center=(x,y))
+
+        # Calculate shooting direction
+        dx = targetX - x
+        dy = targetY - y
+        distance = max((dx*dx + dy*dy) ** 0.5,1)
+
+        speed = 12
+
+        self.velocityX = (dx / distance) * speed
+        self.velocityY = (dy / distance) * speed
+
+        # Rotate quill
+        angle = pygame.math.Vector2(dx, dy).angle_to(pygame.math.Vector2(1,0))
+
+        self.image = pygame.transform.rotate(    self.image,angle )
+
+        self.rect = self.image.get_rect(center=(x,y))
 
     def update(self):
-        self.rect.x += self.speed * self.direction
-        self.life -= 1
-        if self.life <= 0:
-            self.kill()
+        # move position
+        self.x += self.velocityX
+        self.y += self.velocityY
 
-    
+        # update image position
+        self.rect.center = (int(self.x),int(self.y))
+
+        # Calculate distance travelled
+        distance = ((self.x - self.startX) ** 2 +(self.y - self.startY) ** 2) ** 0.5
+
+        # Remove after exceeding range
+        if distance >= self.maxRange:
+            self.kill()
+            
+        # remove after leaving world
+        if (self.x < -100 or self.x > 5000 or self.y < -100 or self.y > 2000):
+            self.kill()
