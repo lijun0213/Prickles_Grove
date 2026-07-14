@@ -20,7 +20,6 @@ class Enemy(pygame.sprite.Sprite):
         self.enemy_hpEmpty = pygame.transform.scale_by(self.enemy_hpEmpty, 4.5)
 
     def takeDamage(self, damage):
-
         self.hp -= damage
 
         if self.hp <= 0:
@@ -298,25 +297,29 @@ class Raccoon(Enemy):
         self.deathTimer = 0
         self.deathDuration = 30  # frames the death animation holds before kill()
 
+        self.flash_timer = 0
+        self.flash_duration = 6
+
     def activate(self):
         # Called once the player gets close enough to trigger the chase —
         # Nugget stops idling and starts randomly running/jumping in panic.
         self.active = True
 
     def takeDamage(self, damage):
-        if self.isDead:
-            return
+        if not self.isDead:
+            self.hp -= damage
+            self.isHurt = True
+            self.hurtTimer = self.hurtDuration
+            
+            # Trigger the flash effect!
+            self.flash_timer = self.flash_duration
 
-        self.hp -= damage
-        self.isHurt = True
-        self.hurtTimer = self.hurtDuration
-
-        if self.hp <= 0:
-            self.hp = 0
-            self.isDead = True
-            self.deathTimer = 60
-            self.currentFrames = self.deathRFrames
-            self.animIndex = 0
+            if self.hp <= 0:
+                self.hp = 0
+                self.isDead = True
+                self.deathTimer = 60
+                self.currentFrames = self.deathRFrames
+                self.animIndex = 0
 
     def update(self, player):
         if self.isDead:
@@ -330,7 +333,9 @@ class Raccoon(Enemy):
 
         if self.active:
             self.runAndJump()
-        # else: stays put on the table, just idles in place
+
+        if self.flash_timer > 0:
+            self.flash_timer -= 1
 
         self.animate()
 
