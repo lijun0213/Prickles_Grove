@@ -70,7 +70,6 @@ class Game:
                         self.current_scene = 1
                         self.scene = Scene1()
                 
-
     # Update game logic
     def update(self):
         self.blink_timer += 1
@@ -82,6 +81,7 @@ class Game:
             self.scene.update()
             if self.current_scene == 1:
                 if self.scene.levelComplete:
+                    pygame.mixer.music.stop()
                     self.current_scene = 3
                     self.scene = Scene3()
 

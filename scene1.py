@@ -49,6 +49,12 @@ class Scene1:
         self.raccoon.bgWidth = self.bgWidth
         self.enemies.add(self.raccoon)
 
+        self.portraits = {
+            "prickle": pygame.transform.scale_by(self.player.idleFrames[0], 1.3),
+            "raccoon": pygame.transform.scale_by(self.raccoon.idleRFrames[0], 1.0),
+        }
+        self.popupSpeaker = None 
+
         windowX, windowY = 900, 200
         self.escapeEnemies.add(
             EscapeEnemy("scene4_assets/wasp_idle.png", 700, 200, windowX, windowY, startDelay=0)
@@ -62,16 +68,20 @@ class Scene1:
 
         self.raccoonActive = False
         self.raccoonDefeated = False
+        self.raccoonDeathDelay = 30
 
         self.showAmmoTutorial = False
         self.showHP = False
 
         # Popup display setup — shown immediately on entering the scene.
         self.showPopup = True
+        self.player.controllable = False
+        self._popupKeyWasDown = False      # tracks SPACE/ENTER state for edge-detection below
         self.popupLines = [
             "OMG... What happened?",
-            "My treasures are gone!"
+            "My treasures!"
         ]
+        self.popupSpeaker = "prickle"
         self.popupNext = None
         self.popupStyle = "center"
         self.ammoInfoShown = False
@@ -105,6 +115,12 @@ class Scene1:
         pygame.mixer.music.load(r"scene1_assets/scene1_bgmusic.mp3")
         pygame.mixer.music.set_volume(0.2) 
         pygame.mixer.music.play(loops=-1)
+
+        # sound effects
+        self.window_broken = pygame.mixer.Sound(r"scene1_assets/window_broken.mp3")
+        self.window_broken.set_volume(0.4)
+        self.level_complete = pygame.mixer.Sound(r"scene1_assets/scene1_complete.mp3")
+        self.level_complete.set_volume(0.4)
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -147,6 +163,7 @@ class Scene1:
             self.popupLines = [
                 "Wait... something's there!"
             ]
+            self.popupSpeaker = "prickle"
             self.showPopup = True
             self.popupNext = "ESCAPE"
  
@@ -162,6 +179,7 @@ class Scene1:
             if enemy.nearWindow and not self.windowBroken:
                 self.windowBroken = True
                 self.windowEffectTimer = self.windowEffectDuration
+                self.window_broken.play()
 
         # Transition once the wasps clear the room
         if len(self.escapeEnemies) == 0:
@@ -169,6 +187,7 @@ class Scene1:
                 "They escaped!",
                 "But someone left behind..."
             ]
+            self.popupSpeaker = "prickle"
             self.popupNext = "CHASE"
             self.showPopup = True
  
@@ -180,6 +199,7 @@ class Scene1:
                 "Try shooting your quills!",
                 "Press LEFT CLICK to shoot!"
             ]
+            self.popupSpeaker = "prickle"
             self.popupNext = "SHOOT"
             self.showPopup = True
 
@@ -201,14 +221,25 @@ class Scene1:
                 "Only 3 quills at a time!",
                 "Cool down 2s to reload."
             ]
+            self.popupSpeaker = "prickle"
             self.popupStyle = "ammo"
             self.popupNext = None
             self.showPopup = True
 
         # If raccoon is dead, drop the map reward
-        if self.raccoon.isDead and self.mapRect is None:
-            self.state = "MAP"
-            self.mapRect = self.mapImage.get_rect(center=self.raccoon.rect.center)
+        if self.raccoon.isDead and not self.raccoonDefeated:
+            if self.raccoonDeathDelay > 0:
+                self.raccoonDeathDelay -= 1
+            else:
+                self.raccoonDefeated = True
+                effects.create_surrender_sparkle(self.raccoon.rect.midtop)
+                self.popupLines = [
+                    "W-wait! I surrender!",
+                    "This is the map!"
+                ]
+                self.popupSpeaker = "raccoon"
+                self.popupNext = "MAP"
+                self.showPopup = True
 
     def updateMap(self, keys):
         self.nearMap = False
@@ -225,6 +256,7 @@ class Scene1:
                         "You found the map!",
                         "Go to Mushroom Meadow!"
                     ]
+                    self.popupSpeaker = "prickle"
                     self.showPopup = True
                     self.state = "EXIT"
 
@@ -232,19 +264,25 @@ class Scene1:
         self.doorGlowTimer += 1
 
         if self.player.rect.colliderect(self.doorRect):
+            self.level_complete.play()
             self.levelComplete = True
         if self.player.rect.x <= 10:
             pygame.mixer.music.fadeout(1000) 
             self.levelComplete = True
 
     def updatePopup(self, keys):
-        # Dismiss text popup window safely across states
-        if keys[pygame.K_SPACE]:
+        keyDown = any(keys[k] for k in self.popupDismissKeys)
+        justPressed = keyDown and not self._popupKeyWasDown
+        self._popupKeyWasDown = keyDown
+
+        if justPressed:
             self.showPopup = False
             self.player.controllable = True
-            if self.popupNext in ["ESCAPE", "CHASE", "SHOOT"]:
+            if self.popupNext in ["ESCAPE", "CHASE", "SHOOT", "MAP"]:
                 self.state = self.popupNext
                 self.popupNext = None
+                if self.state == "MAP" and self.mapRect is None:
+                    self.mapRect = self.mapImage.get_rect(center=self.raccoon.rect.center)
             self.popupStyle = "center"
     
     def updateCamera(self):
@@ -275,19 +313,19 @@ class Scene1:
 
         # Draw Enemy Hurt
         for enemy in self.enemies:
-            if hasattr(enemy, 'flash_timer') and enemy.flash_timer > 0:
+            # Check if the enemy is flashing AND make sure they aren't dead/surrendered
+            is_dead = getattr(enemy, 'isDead', False) or getattr(enemy, 'raccoonConfessed', False)
+            
+            if hasattr(enemy, 'flash_timer') and enemy.flash_timer > 0 and not is_dead:
                 # Create a temporary surface to match the enemy image shape
                 flash_surf = enemy.image.copy()
                 # Tint the surface bright red/pink
                 flash_surf.fill((255, 50, 50, 255), special_flags=pygame.BLEND_RGBA_MULT)
                 screen.blit(flash_surf, (enemy.rect.x - self.cameraX, enemy.rect.y))
             else:
+                # Draw normal image if they are dead or not flashing
                 screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
 
-        # Draw characters & group assets
-        for enemy in self.enemies:
-            screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
-        
         for enemy in self.escapeEnemies:
             screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
 
@@ -310,6 +348,7 @@ class Scene1:
             enemy.drawHP(screen)
 
         effects.update_and_draw_particles(screen, self.cameraX)
+        effects.update_and_draw_surrender(screen, self.cameraX)
  
         if self.showPopup:
             self.drawPopup(screen)
@@ -335,24 +374,50 @@ class Scene1:
             self.drawCenterPopup(screen)
 
     def drawCenterPopup(self, screen):
-        boxWidth, boxHeight = 520, 110
+        portrait = self.portraits.get(self.popupSpeaker)
+
+        boxWidth, boxHeight = 580, 140
         boxX = SCREEN_WIDTH // 2 - boxWidth // 2
-        boxY = SCREEN_HEIGHT - boxHeight - 30
- 
+        boxY = SCREEN_HEIGHT - boxHeight - 20
+
         box = pygame.Surface((boxWidth, boxHeight), pygame.SRCALPHA)
         box.fill((20, 20, 20, 210))
         screen.blit(box, (boxX, boxY))
         pygame.draw.rect(screen, WHITE, (boxX, boxY, boxWidth, boxHeight), width=2, border_radius=8)
- 
+
         font = pygame.font.SysFont("Arial", 18)
         smallFont = pygame.font.SysFont("Arial", 14)
- 
+        nameFont = pygame.font.SysFont("Arial", 15, bold=True)
+
+        textX = boxX + 20
+        textStartY = boxY + 20
+
+        if portrait:
+            plateSize = 90
+            plateX = boxX + 16
+            plateY = boxY + 16
+
+            plate = pygame.Surface((plateSize, plateSize), pygame.SRCALPHA)
+            plate.fill((10, 10, 10, 230))
+            screen.blit(plate, (plateX, plateY))
+            pygame.draw.rect(screen, YELLOW, (plateX, plateY, plateSize, plateSize), width=2, border_radius=6)
+
+            portraitRect = portrait.get_rect(center=(plateX + plateSize // 2, plateY + plateSize // 2))
+            screen.blit(portrait, portraitRect)
+
+            name = "Prickle" if self.popupSpeaker == "prickle" else "Nugget"
+            nameLabel = nameFont.render(name, True, YELLOW)
+            nameRect = nameLabel.get_rect(centerx=plateX + plateSize // 2, top=plateY + plateSize + 4)
+            screen.blit(nameLabel, nameRect)
+
+            textX = plateX + plateSize + 20
+
         for i, line in enumerate(self.popupLines):
             label = font.render(line, True, WHITE)
-            screen.blit(label, (boxX + 20, boxY + 16 + i * 26))
- 
+            screen.blit(label, (textX, textStartY + i * 26))
+
         hint = smallFont.render("Press SPACE to continue", True, YELLOW)
-        screen.blit(hint, (boxX + 20, boxY + boxHeight - 26))
+        screen.blit(hint, (textX, boxY + boxHeight - 26))
 
     def drawAmmoPopup(self, screen):
         boxWidth, boxHeight = 260, 80
