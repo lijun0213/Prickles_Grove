@@ -33,6 +33,38 @@ def update_and_draw_particles(screen, camera_x):
         color = random.choice([(255, 220, 50), (255, 100, 30)])
         pygame.draw.circle(screen, color, (int(p["x"] - camera_x), int(p["y"])), int(p["radius"]))
 
+surrender_particles = []
+
+def create_surrender_sparkle(pos):
+    """Small burst of pale sparkles above a defeated enemy's head, e.g. Nugget's confession."""
+    for _ in range(12):
+        angle = random.uniform(0, math.tau)
+        speed = random.uniform(0.5, 2)
+        surrender_particles.append({
+            "x": pos[0],
+            "y": pos[1],
+            "vx": math.cos(angle) * speed,
+            "vy": math.sin(angle) * speed - 1,
+            "radius": random.randint(2, 4),
+            "life": random.randint(25, 40)
+        })
+
+def update_and_draw_surrender(screen, camera_x):
+    for p in surrender_particles[:]:
+        p["x"] += p["vx"]
+        p["y"] += p["vy"]
+        p["vy"] += 0.05
+        p["life"] -= 1
+
+        if p["life"] <= 0:
+            surrender_particles.remove(p)
+            continue
+
+        alpha = max(0, min(255, p["life"] * 8))
+        surf = pygame.Surface((p["radius"]*2, p["radius"]*2), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (255, 255, 220, alpha), (p["radius"], p["radius"]), p["radius"])
+        screen.blit(surf, (p["x"] - camera_x - p["radius"], p["y"] - p["radius"]))
+
 def drawShatterBurst(screen, center, timer, duration, color=WHITE):
     """Radiating shard-line burst + white flash (e.g. a window breaking).
 

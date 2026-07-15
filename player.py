@@ -160,11 +160,13 @@ class Player(pygame.sprite.Sprite):
         self.cameraX = 0
         self.cameraY = 0
 
-        self.jump_sound = pygame.mixer.Sound(r"player_assets/jump_soundeffect.mp3")
+        self.jump_sound = pygame.mixer.Sound(r"player_assets/jump.mp3")
         self.jump_sound.set_volume(0.4)
-
-        self.pickupItem_sound = pygame.mixer.Sound(r"player_assets/pickup_item_sound.mp3")
+        self.shoot_sound = pygame.mixer.Sound(r"player_assets/quill_shoot.mp3")
+        self.shoot_sound.set_volume(0.4)
+        self.pickupItem_sound = pygame.mixer.Sound(r"player_assets/pickup_item.mp3")
         self.pickupItem_sound.set_volume(0.4)
+        
 
     def update(self, keys, platforms=None):
         prevBottom = self.rect.bottom
@@ -348,6 +350,7 @@ class Player(pygame.sprite.Sprite):
         fire = justClicked and self.attackCooldown == 0 and self.ammo > 0
 
         if fire:
+            self.shoot_sound.play()
             self.shoot()
             self.ammo -= 1
 

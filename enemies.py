@@ -300,6 +300,10 @@ class Raccoon(Enemy):
         self.flash_timer = 0
         self.flash_duration = 6
 
+        # sound effect
+        self.raccoon_whimper = pygame.mixer.Sound(r"scene1_assets/raccoon_whimper.mp3")
+        self.raccoon_whimper.set_volume(0.7)
+
     def activate(self):
         # Called once the player gets close enough to trigger the chase —
         # Nugget stops idling and starts randomly running/jumping in panic.
@@ -320,6 +324,7 @@ class Raccoon(Enemy):
                 self.deathTimer = 60
                 self.currentFrames = self.deathRFrames
                 self.animIndex = 0
+                self.raccoon_whimper.play()
 
     def update(self, player):
         if self.isDead:
