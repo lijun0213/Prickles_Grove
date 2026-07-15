@@ -25,7 +25,7 @@ class Scene3:
         # following him upward instead of letting him keep climbing off the
         # top of the screen. (Camera-follow itself now lives in Player —
         # see Player.updateCamera — this just opts this scene into it.)
-        self.player.cameraFollowY = 175
+        self.player.cameraFollowY = 125
 
 
         self.platforms = [
