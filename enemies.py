@@ -49,23 +49,25 @@ class Enemy(pygame.sprite.Sprite):
             screen.blit(image, (x, y))
 
     
-class Wasp(Enemy):
+import pygame
+import random
+from settings import *
 
+# Assuming a base Enemy class exists in your codebase structure
+# If not explicitly imported, substitute with pygame.sprite.Sprite
+class Wasp(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, 9)
+        super().__init__(x, y, 1)
 
         # Enemy sprite
         waspIdle = pygame.image.load(r"scene4_assets/wasp_idle.png").convert_alpha()
         waspIdle = pygame.transform.scale_by(waspIdle, 1.2)
         waspAttack = pygame.image.load(r"scene4_assets/wasp_attack.png").convert_alpha()
         waspAttack = pygame.transform.scale_by(waspAttack, 1.2)
-        waspHurt = pygame.image.load(r"scene4_assets/wasp_hurt.png").convert_alpha()
-        waspHurt = pygame.transform.scale_by(waspHurt, 1.2)
         
         # Animation frames
         def extractFrames(sheet, numFrames):
             frames = []
-
             frameWidth = sheet.get_width() // numFrames
             frameHeight = sheet.get_height()
 
@@ -74,15 +76,12 @@ class Wasp(Enemy):
                     pygame.Rect(i * frameWidth, 0, frameWidth, frameHeight)
                 )
                 frames.append(frame)
-
             return frames
 
         self.idleRFrames = extractFrames(waspIdle, 4)
         self.idleLFrames = [pygame.transform.flip(f, True, False) for f in self.idleRFrames]
         self.attackRFrames = extractFrames(waspAttack, 7)
         self.attackLFrames = [pygame.transform.flip(f, True, False) for f in self.attackRFrames]
-        self.hurtRFrames = extractFrames(waspHurt, 3)
-        self.hurtLFrames = [pygame.transform.flip(f, True, False) for f in self.hurtRFrames]
 
         # Animation
         self.currentFrames = self.idleRFrames
@@ -97,14 +96,13 @@ class Wasp(Enemy):
 
         # Direction
         self.facingRight = False
-
         self.alive = True
 
-        # AI
-        self.speed = 2
+        # AI Mechanics
+        self.speed = 2  # Modified dynamically inside Scene4 if needed
         self.wanderTarget = self.pickWanderTarget()
         self.wanderTimer = 0
-        self.wanderChangeRate = 90  # frames before picking a new random spot even if not reached
+        self.wanderChangeRate = 90  # frames before picking a new random spot
  
         self.detectRange = 250
         self.attackRange = 60
@@ -157,13 +155,10 @@ class Wasp(Enemy):
             distance = (dx ** 2 + dy ** 2) ** 0.5
 
             if distance <= self.detectRange:
-
                 if distance <= self.attackRange:
                     self.onTouchPlayer(player)
-
                 else:
                     self.chase(player, dx, dy, distance)
-
             else:
                 self.wander()
 
@@ -184,13 +179,11 @@ class Wasp(Enemy):
         if self.attackCooldown == 0 and not self.isHurt:
             self.isAttacking = True
             self.attackTimer = len(self.attackRFrames) * self.animSpeed
-            player.takeDamage(self.attackDamage)
+            player.takeDamage(self.attackDamage) 
             self.attackCooldown = self.attackCooldownMax
     
     def animate(self):
-        if self.isHurt:
-            newFrames = self.hurtRFrames if self.facingRight else self.hurtLFrames
-        elif self.isAttacking:
+        if self.isAttacking:
             newFrames = self.attackRFrames if self.facingRight else self.attackLFrames
         else:
             newFrames = self.idleRFrames if self.facingRight else self.idleLFrames
@@ -201,18 +194,234 @@ class Wasp(Enemy):
             self.animTimer = 0
 
         self.animTimer += 1
-
         if self.animTimer >= self.animSpeed:
             self.animTimer = 0
             self.animIndex = (self.animIndex + 1) % len(self.currentFrames)
 
         self.image = self.currentFrames[self.animIndex]
-
         oldMidBottom = self.rect.midbottom
-
         self.rect = self.image.get_rect()
-
         self.rect.midbottom = oldMidBottom
+
+
+class WaspQueen(Enemy):
+    def __init__(self, x, y, teleportSpots=None, stingGroup=None, scale=1.4):
+        super().__init__(x, y, 10)
+
+        self.stingGroup = stingGroup           # Bound correctly via initializer 
+        self.stingRange = 400                  
+        self.stingCooldown = 0
+        self.stingCooldownMax = 100  
+
+        queenIdle = pygame.image.load(r"scene4_assets/queen_idle.png").convert_alpha()
+        queenIdle = pygame.transform.scale_by(queenIdle, scale)
+        queenAttack = pygame.image.load(r"scene4_assets/queen_attack.png").convert_alpha()
+        queenAttack = pygame.transform.scale_by(queenAttack, scale)
+        queenSting = pygame.image.load(r"scene4_assets/queen_sting.png").convert_alpha()
+        queenSting = pygame.transform.scale_by(queenSting, scale)
+
+        def extractFrames(sheet, numFrames):
+            frameWidth = sheet.get_width() // numFrames
+            frameHeight = sheet.get_height()
+            return [sheet.subsurface(pygame.Rect(i * frameWidth, 0, frameWidth, frameHeight))
+                    for i in range(numFrames)]
+
+        self.idleLFrames = extractFrames(queenIdle, 4)
+        self.idleRFrames = [pygame.transform.flip(f, True, False) for f in self.idleLFrames]
+        self.attackLFrames = extractFrames(queenAttack, 4)
+        self.attackRFrames = [pygame.transform.flip(f, True, False) for f in self.attackLFrames]
+        self.stingLFrames = extractFrames(queenSting, 2)
+        self.stingRFrames = [pygame.transform.flip(f, True, False) for f in self.stingLFrames]
+
+        self.currentFrames = self.idleRFrames
+        self.animIndex = 0
+        self.animTimer = 0
+        self.animSpeed = 8
+
+        self.image = self.currentFrames[0]
+        self.rect = self.image.get_rect(center=(x, y))
+        self.facingRight = True
+
+        self.teleportSpots = teleportSpots or [(x, y)]
+        self.hitsTaken = 0
+        self.maxHits = 10
+
+        self.attackRange = 70
+        self.attackCooldown = 0
+        self.attackCooldownMax = 90
+        self.isAttacking = False
+        self.attackTimer = 0
+
+        self.isHurt = False
+        self.hurtTimer = 0
+        self.hurtDuration = 10
+
+        # Teleport calculations
+        self.teleporting = False
+        self.teleportPhase = None       
+        self.teleportTimer = 0
+        self.teleportOutDuration = 15
+        self.teleportInDuration = 15
+        self.idleTeleportCooldown = 0
+        self.idleTeleportCooldownMax = 300  
+
+        self.shakeTimer = 0
+        self.shakeDuration = 12
+        self.shakeMagnitude = 6
+
+    def takeDamage(self, damage):
+        if self.teleporting or self.hp <= 0:
+            return  
+
+        self.hitsTaken += 1
+        self.hp = max(0, self.maxHits - self.hitsTaken)
+        self.isHurt = True
+        self.hurtTimer = self.hurtDuration
+        self.shakeTimer = self.shakeDuration
+
+        if self.hitsTaken >= self.maxHits:
+            self.hp = 0
+            self.kill()
+        else:
+            self.startTeleport()
+
+    def startTeleport(self):
+        self.teleporting = True
+        self.teleportPhase = "out"
+        self.teleportTimer = self.teleportOutDuration
+
+    def update(self, player, active=False):
+        if self.hp <= 0:
+            return
+        
+        if not active:
+            if self.shakeTimer > 0:
+                self.shakeTimer -= 1
+            self.animate()
+            return
+
+        if self.teleporting:
+            self.updateTeleport()
+        else:
+            self.idleTeleportCooldown += 1
+            if self.idleTeleportCooldown >= self.idleTeleportCooldownMax:
+                self.startTeleport()
+
+            dx = player.rect.centerx - self.rect.centerx
+            dy = player.rect.centery - self.rect.centery
+            distance = max((dx ** 2 + dy ** 2) ** 0.5, 1)
+
+            if distance <= self.attackRange:
+                self.onTouchPlayer(player)
+            elif distance <= self.stingRange and self.stingCooldown == 0 and self.stingGroup is not None:
+                self.fireSting(player)
+            else:
+                self.rect.x += (dx / distance) * 1.5
+                self.rect.y += (dy / distance) * 1.5
+
+            self.facingRight = dx > 0
+
+        if self.attackCooldown > 0:
+            self.attackCooldown -= 1
+        if self.stingCooldown > 0:
+            self.stingCooldown -= 1
+        if self.isHurt:
+            self.hurtTimer -= 1
+            if self.hurtTimer <= 0:
+                self.isHurt = False
+        if self.shakeTimer > 0:
+            self.shakeTimer -= 1
+        if self.isAttacking:
+            self.attackTimer -= 1
+            if self.attackTimer <= 0:
+                self.isAttacking = False
+
+        self.animate()
+
+    def fireSting(self, player):
+        self.isAttacking = True
+        self.attackTimer = len(self.attackRFrames) * self.animSpeed
+        sting = Sting(self.rect.centerx, self.rect.centery, player.rect.centerx, player.rect.centery)
+        self.stingGroup.add(sting)
+        self.stingCooldown = self.stingCooldownMax
+
+    def onTouchPlayer(self, player):
+        if self.attackCooldown == 0 and not self.isHurt:
+            self.isAttacking = True
+            self.attackTimer = len(self.attackRFrames) * self.animSpeed
+            player.takeDamage(1)
+            self.attackCooldown = self.attackCooldownMax
+
+    def updateTeleport(self):
+        self.teleportTimer -= 1
+
+        if self.teleportPhase == "out" and self.teleportTimer <= 0:
+            newSpot = random.choice(self.teleportSpots)
+            self.rect.center = newSpot
+            self.teleportPhase = "in"
+            self.teleportTimer = self.teleportInDuration
+
+        elif self.teleportPhase == "in" and self.teleportTimer <= 0:
+            self.teleporting = False
+            self.teleportPhase = None
+            self.idleTeleportCooldown = 0
+
+    def animate(self):
+        if self.isAttacking:
+            newFrames = self.attackRFrames if self.facingRight else self.attackLFrames
+        else:
+            newFrames = self.idleRFrames if self.facingRight else self.idleLFrames
+
+        if newFrames != self.currentFrames:
+            self.currentFrames = newFrames
+            self.animIndex = 0
+            self.animTimer = 0
+
+        self.animTimer += 1
+        if self.animTimer >= self.animSpeed:
+            self.animTimer = 0
+            self.animIndex = (self.animIndex + 1) % len(self.currentFrames)
+
+        self.image = self.currentFrames[self.animIndex]
+        oldCenter = self.rect.center
+        self.rect = self.image.get_rect()
+        self.rect.center = oldCenter
+
+
+class Sting(pygame.sprite.Sprite):
+    def __init__(self, x, y, targetX, targetY, speed=7, maxRange=600):
+        super().__init__()
+
+        self.image = pygame.Surface((22, 10), pygame.SRCALPHA)
+        pygame.draw.ellipse(self.image, (255, 210, 0), (0, 0, 16, 10))
+        pygame.draw.polygon(self.image, (40, 40, 40), [(14, 3), (22, 5), (14, 7)])
+
+        self.x = float(x)
+        self.y = float(y)
+        self.startX, self.startY = self.x, self.y
+        self.maxRange = maxRange
+
+        dx = targetX - x
+        dy = targetY - y
+        distance = max((dx * dx + dy * dy) ** 0.5, 1)
+        self.velocityX = (dx / distance) * speed
+        self.velocityY = (dy / distance) * speed
+
+        angle = pygame.math.Vector2(dx, dy).angle_to(pygame.math.Vector2(1, 0))
+        self.image = pygame.transform.rotate(self.image, angle)
+        self.rect = self.image.get_rect(center=(x, y))
+
+    def update(self):
+        self.x += self.velocityX
+        self.y += self.velocityY
+        self.rect.center = (int(self.x), int(self.y))
+
+        distance = ((self.x - self.startX) ** 2 + (self.y - self.startY) ** 2) ** 0.5
+        if distance >= self.maxRange:
+            self.kill()
+        if self.x < -100 or self.x > 2000 or self.y < -100 or self.y > 1500:
+            self.kill()
+
 
 class Raccoon(Enemy):
     def __init__(self, x, y):

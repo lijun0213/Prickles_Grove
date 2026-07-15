@@ -116,3 +116,12 @@ def drawDoorGlow(screen, rect, timer, baseColor=(255, 255, 255)):
             
     # 3. Blit the final combined soft glow directly to the left edge of the monitor
     screen.blit(glowSurface, (0, 0))
+
+def drawTeleportPuff(screen, center, camera_x=0, color=(255, 220, 255)):
+    """Small radiating ring, blitted once at teleport-out and teleport-in points."""
+    cx, cy = center[0] - camera_x, center[1]
+    surf = pygame.Surface((80, 80), pygame.SRCALPHA)
+    for r in range(10, 40, 8):
+        alpha = max(0, 200 - r * 4)
+        pygame.draw.circle(surf, (*color, alpha), (40, 40), r, width=2)
+    screen.blit(surf, (cx - 40, cy - 40))
