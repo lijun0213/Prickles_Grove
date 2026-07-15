@@ -705,10 +705,17 @@ class Feathers(Enemy):
         self.hoverOffset = hoverOffset
         self.verticalSpeed = 3
 
+        # Keeps the whole sprite on screen on both axes — without this, a
+        # large hoverOffset can push Feathers' target above y=0 (off the top
+        # of the screen) whenever Prickle is already near the top himself,
+        # since the raw target is just "player's y minus hoverOffset" with
+        # nothing stopping it from going negative.
+        self.screenMargin = 20
+
     def pickWanderTargetX(self):
-        margin = 40
-        low = max(margin, self.rect.centerx - self.wanderRange)
-        high = min(SCREEN_WIDTH - margin, self.rect.centerx + self.wanderRange)
+        halfWidth = self.rect.width // 2
+        low = self.screenMargin + halfWidth
+        high = SCREEN_WIDTH - self.screenMargin - halfWidth
         if low >= high:
             return self.rect.centerx
         return random.randint(low, high)
@@ -733,11 +740,25 @@ class Feathers(Enemy):
 
         # Vertical: ease toward hoverOffset px above Prickle's current
         # screen position — never snaps, so it smoothly rises as he climbs.
+        # Clamped so the target itself never asks Feathers to leave the
+        # screen, regardless of how large hoverOffset is or where Prickle
+        # currently is.
+        halfHeight = self.rect.height // 2
+        minCentery = self.screenMargin + halfHeight
+        maxCentery = SCREEN_HEIGHT - self.screenMargin - halfHeight
         targetY = player.rect.centery - self.hoverOffset
+        targetY = max(minCentery, min(maxCentery, targetY))
+
         dy = targetY - self.rect.centery
         if abs(dy) > 1:
             step = min(self.verticalSpeed, abs(dy))
             self.rect.y += step if dy > 0 else -step
+
+        # Hard safety clamp on top of the eased tracking above — belt and
+        # braces in case Feathers ever starts off-screen (e.g. its initial
+        # spawn position) or something else nudges its rect directly.
+        self.rect.x = max(self.screenMargin, min(SCREEN_WIDTH - self.screenMargin - self.rect.width, self.rect.x))
+        self.rect.y = max(self.screenMargin, min(SCREEN_HEIGHT - self.screenMargin - self.rect.height, self.rect.y))
 
         self.animate()
 
