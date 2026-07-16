@@ -20,7 +20,11 @@ class Game:
         self.clock  = pygame.time.Clock()
 
         try:
-            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_CROSSHAIR)
+            self.bg = pygame.image.load(r"player_assets/scene0_bg.png").convert_alpha()
+            bgWidth, bgHeight = self.bg.get_size()
+            scale = SCREEN_HEIGHT / bgHeight
+            self.bg = pygame.transform.scale(self.bg, (int(bgWidth * scale), SCREEN_HEIGHT))
+            self.bgWidth = self.bg.get_width()
         except pygame.error:
             pass  
 
@@ -215,6 +219,8 @@ class Game:
         self.screen.blit(label, (10, 30))
 
     def draw_main_menu(self):
+        if self.bg:
+            self.screen.blit(self.bg, (0,0))
         font_big   = pygame.font.SysFont("Arial", 48, bold=True)
         font_small = pygame.font.SysFont("Arial", 20)
         title = font_big.render("Prickle's Grove", True, WHITE)

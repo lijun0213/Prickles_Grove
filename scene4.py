@@ -43,7 +43,7 @@ class Scene4:
         self.lastSafePos = self.player.rect.midbottom
 
         # 3. Position the Boss Arena further down the long world path
-        self.bossTeleportSpots = [(1100, 200), (350, 150), (1500, 250), (1250, 100)]
+        self.bossTeleportSpots = [(1100, 200), (1350, 150), (1500, 250), (1250, 100)]
         self.boss = WaspQueen(self.bossTeleportSpots[1][0], self.bossTeleportSpots[1][1],
                              teleportSpots=self.bossTeleportSpots, stingGroup=self.quills)
 
