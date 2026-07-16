@@ -5,7 +5,6 @@ from settings import *
 pygame.init()
 
 class Enemy(pygame.sprite.Sprite):
-
     def __init__(self, x, y, hp):
         super().__init__()
 
@@ -48,13 +47,7 @@ class Enemy(pygame.sprite.Sprite):
 
             screen.blit(image, (x, y))
 
-    
-import pygame
-import random
-from settings import *
 
-# Assuming a base Enemy class exists in your codebase structure
-# If not explicitly imported, substitute with pygame.sprite.Sprite
 class Wasp(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, 1)

@@ -247,14 +247,15 @@ class Player(pygame.sprite.Sprite):
                     self.velocityY = 0
                     self.velocityX = 0
                     self.onGround = True
+                    
+                    # RIDE LOGIC: Move with the platform if it is moving
+                    if hasattr(platform, 'movementDeltaX'):
+                        self.rect.x += platform.movementDeltaX
+                        self.rect.y += platform.movementDeltaY
                     return
             self.currentPlatform = None
 
-        # Check for landing on any platform. Platform bounding boxes can
-        # overlap (a rotated/scaled branch's box can stretch across other
-        # obstacles), so rather than taking whichever platform happens to be
-        # first in the list, pick whichever valid landing is HIGHEST — the
-        # surface Prickle would actually hit first while falling.
+        # Check for landing on any platform.
         bestPlatform = None
         bestLandY = None
 
@@ -280,9 +281,7 @@ class Player(pygame.sprite.Sprite):
             bounceVY = getattr(bestPlatform, "bounceVY", None)
 
             if bounceVY is not None:
-                # Bounce pad (e.g. Mushroom) — launch back up (and sideways,
-                # if it's rotated) instead of resting on it, and play its
-                # squash/release animation.
+                # Bounce pad (e.g. Mushroom)
                 self.rect.bottom = bestLandY
                 self.velocityY = bounceVY
                 self.velocityX = getattr(bestPlatform, "bounceVX", 0)
@@ -296,6 +295,11 @@ class Player(pygame.sprite.Sprite):
                 self.velocityX = 0
                 self.onGround = True
                 self.currentPlatform = bestPlatform
+                
+                # RIDE LOGIC: Move with the platform on the frame we land
+                if hasattr(bestPlatform, 'movementDeltaX'):
+                    self.rect.x += bestPlatform.movementDeltaX
+                    self.rect.y += bestPlatform.movementDeltaY
 
             return
 

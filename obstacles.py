@@ -263,3 +263,40 @@ class Wall:
 
     def update(self):
         pass
+
+class MovingPlatform(Platform):
+    def __init__(self, imagePath, x, y, scale=1.0, moveRange=200, speed=2, axis='X'):
+        super().__init__(imagePath, x, y, scale)
+        self.startX = x
+        self.startY = y
+        self.moveRange = moveRange
+        self.speed = speed
+        self.axis = axis.upper() # 'X' for horizontal, 'Y' for vertical
+        self.direction = 1
+
+        self.scale = scale
+        if scale != 1.0:
+            self.image = pygame.transform.scale_by(self.image, scale)
+        
+        # Keep track of how much the platform shifted on the current frame
+        # The player code will read this to move the player alongside it
+        self.movementDeltaX = 0
+        self.movementDeltaY = 0
+
+    def update(self):
+        oldX = self.rect.x
+        oldY = self.rect.y
+
+        if self.axis == 'X':
+            self.rect.x += self.speed * self.direction
+            # Reverse direction if bounds exceeded
+            if abs(self.rect.x - self.startX) >= self.moveRange:
+                self.direction *= -1
+        else: # 'Y' axis movement
+            self.rect.y += self.speed * self.direction
+            if abs(self.rect.y - self.startY) >= self.moveRange:
+                self.direction *= -1
+
+        # Calculate exact change in position this frame
+        self.movementDeltaX = self.rect.x - oldX
+        self.movementDeltaY = self.rect.y - oldY

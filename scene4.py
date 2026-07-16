@@ -3,7 +3,7 @@ import random
 from settings import *
 from player import Player
 from enemies import Wasp, WaspQueen, Sting
-from obstacles import Platform
+from obstacles import Platform, MovingPlatform
 import effects
 
 class Scene4:
@@ -29,8 +29,9 @@ class Scene4:
         # 2. Distribute platforms across the long scrolling horizon sequence
         self.platforms = [
             Platform(r"scene4_assets/flower_platform1.png", x=80, y=380, scale=0.5),
-            Platform(r"scene4_assets/flower_platform1.png", x=400, y=380, scale=0.5),
+            MovingPlatform(r"scene4_assets/flower_platform1.png", x=400, y=380, scale=0.5, moveRange=100, speed=2, axis='X'),
             Platform(r"scene4_assets/flower_platform1.png", x=750, y=320, scale=0.5),
+            MovingPlatform(r"scene4_assets/flower_platform1.png", x=1050, y=380, scale=0.5, moveRange=100, speed=1.5, axis='Y'),
             Platform(r"scene4_assets/flower_platform1.png", x=1100, y=380, scale=0.5),
             Platform(r"scene4_assets/flower_platform1.png", x=1450, y=280, scale=0.5),
         ]
@@ -115,6 +116,10 @@ class Scene4:
             if self.boss:
                 self.boss.update(self.player, active=False)
             return
+        
+        for platform in self.platforms:
+            if hasattr(platform, 'update'):
+                platform.update()
 
         # Core operational loops
         self.player.update(keys, platforms=self.platforms)
