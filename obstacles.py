@@ -11,7 +11,7 @@ class Platform(pygame.sprite.Sprite):
     feels like landing on the branch itself, not an invisible box around it.
     """
 
-    def __init__(self, imagePath, x, y, angle=0, scale=1.0, blocksBullets=False):
+    def __init__(self, imagePath, x, y, angle=0, scale=1.0, blocksBullets=False, visible=True):
         super().__init__()
         self.image = pygame.image.load(imagePath).convert_alpha()
 
@@ -25,6 +25,7 @@ class Platform(pygame.sprite.Sprite):
 
         self.rect = self.image.get_rect(topleft=(x, y))
         self.blocksBullets = blocksBullets
+        self.visible = visible
 
         self.baseY = self.rect.y
 
@@ -58,7 +59,8 @@ class Platform(pygame.sprite.Sprite):
         return self.mask.overlap(otherMask, offset) is not None
 
     def draw(self, screen):
-        screen.blit(self.image, self.rect)
+        if self.visible:
+            screen.blit(self.image, self.rect)
 
     def update(self):
         pass
