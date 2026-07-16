@@ -6,9 +6,11 @@
 import pygame
 import sys
 from settings import *
+from scene0 import Scene0
 from scene1 import Scene1
 from scene3 import Scene3
-from scene0 import Scene0
+from scene4 import Scene4
+
 
 class Game:
     def __init__(self):
@@ -67,8 +69,8 @@ class Game:
 
                 if event.key == pygame.K_SPACE:
                     if self.current_scene == 0 :
-                        self.current_scene = 3
-                        self.scene = Scene3()
+                        self.current_scene = 1
+                        self.scene = Scene1()
                 
     # Update game logic
     def update(self):
@@ -82,8 +84,8 @@ class Game:
             if self.current_scene == 1:
                 if self.scene.levelComplete:
                     pygame.mixer.music.stop()
-                    self.current_scene = 3
-                    self.scene = Scene3()
+                    self.current_scene = 4
+                    self.scene = Scene4()
 
     # Draw everything to screen
     def draw(self):

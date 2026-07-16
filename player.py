@@ -154,6 +154,8 @@ class Player(pygame.sprite.Sprite):
         self.spriteFlashAmount = 60  # subtler than the heart flash — just a slight red glow on Prickle himself
         self.hpFlashTimer = 0
         self._hpFlashCache = {}
+        self.paralyzed = False
+        self.paralyzeTimer = 0
 
         # Vertical camera-follow (mirrors how bgWidth bounds horizontal
         # movement). scrollY is how far the world has scrolled to keep
@@ -211,6 +213,10 @@ class Player(pygame.sprite.Sprite):
 
         if self.hpFlashTimer > 0:
             self.hpFlashTimer -= 1
+        if self.paralyzed:
+            self.paralyzeTimer -= 1
+            if self.paralyzeTimer <= 0:
+                self.paralyzed = False
 
         self.animate(keys)
 
@@ -252,14 +258,15 @@ class Player(pygame.sprite.Sprite):
                     self.velocityY = 0
                     self.velocityX = 0
                     self.onGround = True
+                    
+                    # RIDE LOGIC: Move with the platform if it is moving
+                    if hasattr(platform, 'movementDeltaX'):
+                        self.rect.x += platform.movementDeltaX
+                        self.rect.y += platform.movementDeltaY
                     return
             self.currentPlatform = None
 
-        # Check for landing on any platform. Platform bounding boxes can
-        # overlap (a rotated/scaled branch's box can stretch across other
-        # obstacles), so rather than taking whichever platform happens to be
-        # first in the list, pick whichever valid landing is HIGHEST — the
-        # surface Prickle would actually hit first while falling.
+        # Check for landing on any platform.
         bestPlatform = None
         bestLandY = None
 
@@ -285,9 +292,7 @@ class Player(pygame.sprite.Sprite):
             bounceVY = getattr(bestPlatform, "bounceVY", None)
 
             if bounceVY is not None:
-                # Bounce pad (e.g. Mushroom) — launch back up (and sideways,
-                # if it's rotated) instead of resting on it, and play its
-                # squash/release animation.
+                # Bounce pad (e.g. Mushroom)
                 self.rect.bottom = bestLandY
                 self.velocityY = bounceVY
                 self.velocityX = getattr(bestPlatform, "bounceVX", 0)
@@ -301,6 +306,11 @@ class Player(pygame.sprite.Sprite):
                 self.velocityX = 0
                 self.onGround = True
                 self.currentPlatform = bestPlatform
+                
+                # RIDE LOGIC: Move with the platform on the frame we land
+                if hasattr(bestPlatform, 'movementDeltaX'):
+                    self.rect.x += bestPlatform.movementDeltaX
+                    self.rect.y += bestPlatform.movementDeltaY
 
             return
 
@@ -310,47 +320,48 @@ class Player(pygame.sprite.Sprite):
         self.isRunning = keys[pygame.K_LSHIFT]
         self.speed = 8 if self.isRunning else 5
 
-        if keys[pygame.K_a]:
-            self.rect.x -= self.speed
-            self.velocityX = 0  # manual input always overrides bounce drift
-            self.direction = -1
-            self.facingRight = False
+        if not self.paralyzed:
+            if keys[pygame.K_a]:
+                self.rect.x -= self.speed
+                self.velocityX = 0  # manual input always overrides bounce drift
+                self.direction = -1
+                self.facingRight = False
 
-        elif keys[pygame.K_d]:
-            self.rect.x += self.speed
-            self.velocityX = 0
-            self.direction = 1
-            self.facingRight = True
+            elif keys[pygame.K_d]:
+                self.rect.x += self.speed
+                self.velocityX = 0
+                self.direction = 1
+                self.facingRight = True
 
-        else:
-            self.direction = 0
-            if self.velocityX:
-                self.rect.x += self.velocityX
+            else:
+                self.direction = 0
+                if self.velocityX:
+                    self.rect.x += self.velocityX
 
-        # Keep Prickle inside the screen horizontally
-        if self.rect.left < 0:
-            self.rect.left = 0
-            self.velocityX = 0
-        elif self.rect.right > self.bgWidth:
-            self.rect.right = self.bgWidth
-            self.velocityX = 0
+            # Keep Prickle inside the screen horizontally
+            if self.rect.left < 0:
+                self.rect.left = 0
+                self.velocityX = 0
+            elif self.rect.right > self.bgWidth:
+                self.rect.right = self.bgWidth
+                self.velocityX = 0
 
-        if keys[pygame.K_SPACE] and self.onGround:
-            self.velocityY = -15
-            self.onGround = False
-            self.jump_sound.play()
+            if keys[pygame.K_SPACE] and self.onGround:
+                self.velocityY = -15
+                self.onGround = False
+                self.jump_sound.play()
 
-        # Apply gravity
-        self.velocityY += 0.87
-        self.rect.y += self.velocityY
+            # Apply gravity
+            self.velocityY += 0.87
+            self.rect.y += self.velocityY
 
-        if self.rect.bottom >= self.groundY:
-            self.rect.bottom = self.groundY
-            self.velocityY = 0
-            self.velocityX = 0
-            self.onGround = True
-        else:
-            self.onGround = False
+            if self.rect.bottom >= self.groundY:
+                self.rect.bottom = self.groundY
+                self.velocityY = 0
+                self.velocityX = 0
+                self.onGround = True
+            else:
+                self.onGround = False
 
     def handleAttack(self):
         mouse_buttons = pygame.mouse.get_pressed()
@@ -448,6 +459,11 @@ class Player(pygame.sprite.Sprite):
         if self.hp <= 0:
             self.hp = 0
             print("Player Dead")
+
+    def applyParalysis(self, duration):
+        if not self.paralyzed:
+            self.paralyzed = True
+            self.paralyzeTimer = duration
 
     def animate(self, keys):
         if self.direction == 1:
