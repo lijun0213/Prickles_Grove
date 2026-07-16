@@ -274,6 +274,21 @@ class Scene1:
             pygame.mixer.music.fadeout(1000)
             self.levelComplete = True
 
+    def updatePopup(self, keys):
+        keyDown = any(keys[k] for k in self.popupDismissKeys)
+        justPressed = keyDown and not self._popupKeyWasDown
+        self._popupKeyWasDown = keyDown
+
+        if justPressed:
+            self.showPopup = False
+            self.player.controllable = True
+            if self.popupNext in ["ESCAPE", "CHASE", "SHOOT", "MAP"]:
+                self.state = self.popupNext
+                self.popupNext = None
+                if self.state == "MAP" and self.mapRect is None:
+                    self.mapRect = self.mapImage.get_rect(center=self.raccoon.rect.center)
+            self.popupStyle = "center"
+    
     def updateCamera(self):
         self.cameraX = self.player.rect.centerx - SCREEN_WIDTH // 2
         self.cameraX = max(0, min(self.cameraX, self.bgWidth - SCREEN_WIDTH))
@@ -302,19 +317,14 @@ class Scene1:
 
         # Draw Enemy Hurt
         for enemy in self.enemies:
-            # Check if the enemy is flashing AND make sure they aren't dead/surrendered
-            is_dead = getattr(enemy, 'isDead', False) or getattr(enemy, 'raccoonConfessed', False)
+            is_dead = enemy.isDead or enemy.raccoonConfessed
 
-            if hasattr(enemy, 'flash_timer') and enemy.flash_timer > 0 and not is_dead:
-                # Create a temporary surface to match the enemy image shape
+            if enemy.flash_timer > 0 and not is_dead:
                 flash_surf = enemy.image.copy()
-                # Tint the surface bright red/pink
                 flash_surf.fill((255, 50, 50, 255), special_flags=pygame.BLEND_RGBA_MULT)
                 screen.blit(flash_surf, (enemy.rect.x - self.cameraX, enemy.rect.y))
             else:
-                # Draw normal image if they are dead or not flashing
                 screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
-
         for enemy in self.escapeEnemies:
             screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
 

@@ -20,7 +20,11 @@ class Game:
         self.clock  = pygame.time.Clock()
 
         try:
-            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_CROSSHAIR)
+            self.bg = pygame.image.load(r"player_assets/scene0_bg.png").convert_alpha()
+            bgWidth, bgHeight = self.bg.get_size()
+            scale = SCREEN_HEIGHT / bgHeight
+            self.bg = pygame.transform.scale(self.bg, (int(bgWidth * scale), SCREEN_HEIGHT))
+            self.bgWidth = self.bg.get_width()
         except pygame.error:
             pass  
 
@@ -72,19 +76,39 @@ class Game:
                     
                     if event.key in (pygame.K_SPACE, pygame.K_RETURN):
                         if self.selected_option == 0:  # Retry
-                            self.game_over = False
-                            self.scene = Scene3()  # Hard reset scene instance
+                            self.restart_level()  # Hard reset scene instance
                         elif self.selected_option == 1:  # Quit to Main Menu
-                            self.game_over = False
-                            self.current_scene = 0
-                            self.scene = None
-                    return  # Bypass normal controls during game over
+                            self.exit_to_menu()
+                    continue  # Skip checking normal gameplay key presses
 
-                # --- Standard Menu Scene Starting Navigation ---
-                if event.key == pygame.K_SPACE:
-                    if self.current_scene == 0 :
-                        self.current_scene = 3
-                        self.scene = Scene3()
+                # --- Normal Gameplay Key Bindings ---
+                if event.key == pygame.K_SPACE and self.current_scene == 0:
+                    self.current_scene = 4
+                    self.scene = Scene4()
+
+    def restart_level(self):
+        self.game_over = False
+        self.death_timer = 0  # Reset overlay animation timer
+        
+        # Instantiate a fresh copy of the scene based on active current_scene ID
+        if self.current_scene == 1:
+            self.scene = Scene1()
+        elif self.current_scene == 3:
+            self.scene = Scene3() 
+        elif self.current_scene == 4:
+            self.scene = Scene4()
+
+    def exit_to_menu(self):
+        self.game_over = False
+        self.death_timer = 0
+        self.current_scene = 0
+        self.scene = None
+
+        # --- Standard Menu Scene Starting Navigation ---
+        if event.key == pygame.K_SPACE:
+            if self.current_scene == 0 :
+                self.current_scene = 3
+                self.scene = Scene3()
                 
     def update(self):
         self.blink_timer += 1
@@ -92,22 +116,25 @@ class Game:
             self.blink_show  = not self.blink_show  
             self.blink_timer = 0
 
-        # 1. If global Game Over state is locked on
+        # 1. If game over is triggered, run the overlay fade transition
         if self.game_over:
             if self.death_timer < self.death_duration:
                 self.death_timer += 1
-            return
+            return  # Stop updating the underlying level
 
-        # 2. Update current levels
+        # 2. Update current active scene
         if self.current_scene != 0 and self.scene:
             self.scene.update()
 
-            # --- Interlock with Scene4's Death State ---
-            if self.scene.state == "DEATH" and self.scene.deathTimer <= 0:
+            # --- Player HP Death Check ---
+            # Direct check using self.scene.player.hp
+            if self.scene.player.hp <= 0:
+                self.scene.player.takeDamage = True
                 self.game_over = True
                 self.death_timer = 0
                 self.selected_option = 0
 
+            # Level completion transition
             if self.current_scene == 1:
                 if self.scene.levelComplete:
                     pygame.mixer.music.stop()
@@ -198,6 +225,8 @@ class Game:
         self.screen.blit(label, (10, 30))
 
     def draw_main_menu(self):
+        if self.bg:
+            self.screen.blit(self.bg, (0,0))
         font_big   = pygame.font.SysFont("Arial", 48, bold=True)
         font_small = pygame.font.SysFont("Arial", 20)
         title = font_big.render("Prickle's Grove", True, WHITE)
