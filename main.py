@@ -73,7 +73,7 @@ class Game:
                     if event.key in (pygame.K_SPACE, pygame.K_RETURN):
                         if self.selected_option == 0:  # Retry
                             self.game_over = False
-                            self.scene = Scene4()  # Hard reset scene instance
+                            self.scene = Scene3()  # Hard reset scene instance
                         elif self.selected_option == 1:  # Quit to Main Menu
                             self.game_over = False
                             self.current_scene = 0
@@ -83,8 +83,8 @@ class Game:
                 # --- Standard Menu Scene Starting Navigation ---
                 if event.key == pygame.K_SPACE:
                     if self.current_scene == 0 :
-                        self.current_scene = 4
-                        self.scene = Scene4()
+                        self.current_scene = 3
+                        self.scene = Scene3()
                 
     def update(self):
         self.blink_timer += 1

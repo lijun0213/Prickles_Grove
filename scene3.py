@@ -3,6 +3,8 @@ from settings import *
 from player import Player
 from obstacles import Platform, Wall, Mushroom, Nest
 from enemies import Feathers
+from dialogue import Dialogue
+import effects
 
 class Scene3:
     def __init__(self):
@@ -41,7 +43,7 @@ class Scene3:
             Platform(r"scene3_assets/branch_right.png", x=360, y=-50, angle=22, scale = (1.5, 1.3)),
             Platform(r"scene3_assets/branch_left.png", x=75, y=-155, angle=-22, scale = (1.7, 1.3)),
             Mushroom(r"scene3_assets/bouncy mushroom.png", x=100, y=-220, bounceForce=20, angle=-10),
-            Platform(r"scene3_assets/spiky branch.png", x=285, y=-400, angle=-50, scale = 1, blocksBullets=True),
+            Platform(r"scene3_assets/spiky branch.png", x=285, y=-400, angle=-50, scale = 1, blocksBullets=True, hazard=True),
         ]
 
 
@@ -61,8 +63,123 @@ class Scene3:
         self.feathers = Feathers(x=400, y=-350, bombGroup=self.bombs, hp=10, hoverOffset=250, wanderRange=150,
                                   bombIntervalSeconds=1)
 
+        # Golden petal — the actual reward, visible sitting on top of the
+        # nest from the start so Prickle can see what he's fighting for.
+        # Once the nest is destroyed it drops straight down to the floor
+        # (deliberately ignoring whatever branches/bridge it passes on the
+        # way, rather than resting on the nearest one — it belongs on the
+        # ground), then sits there to be picked up the same way Scene1's map
+        # pickup works: get close and press R. Pinned to the floor
+        # platform's scrolled position once landed, same landedPlatform/
+        # landOffset trick Bomb and dead Feathers use, so it stays put on
+        # screen as Prickle climbs back down.
+        self.petalImage = pygame.image.load(r"scene3_assets/golden petal.png").convert_alpha()
+        self.petalImage = pygame.transform.scale_by(self.petalImage, 0.1)
+        nest = self.nests[0]
+        self.petalRestOffset = 20  # how far below the nest's top edge it sits, nestled into the bowl
+        self.petalRect = self.petalImage.get_rect(center=(nest.rect.centerx, nest.rect.top + self.petalRestOffset))
+        self.petalFalling = False
+        self.petalLanded = False
+        self.petalCollected = False
+        self.nearPetal = False
+        self.petalFallSpeed = 6
+        self.petalLandOffset = 0
+
+        # Scene-level state — mainly so main.py's death/Game-Over interlock
+        # (which checks scene.state/scene.deathTimer the same way it does for
+        # Scene4) has something to read. Scene3 itself only ever has two
+        # states: normal play, and the death sequence once Prickle's HP hits 0.
+        self.state = "PLAYING"
+        self.deathTimer = 0
+        self.deathDuration = 120  # ~2 seconds at 60fps before Game Over shows
+
+        # Spiky branch — touching it doesn't hurt instantly/every frame,
+        # just a heart every 2 seconds for as long as Prickle stays in
+        # contact with it (rather than a one-shot hit like a bullet, or
+        # constant per-frame damage that would drain HP almost instantly).
+        self.hazardDamageTimer = 0
+        self.hazardDamageInterval = FPS * 2
+
+        # Opening dialogue — same shared textbox component Scene1/Scene4
+        # use. Freezes the scene (see the top of update()) while it plays,
+        # then hands control back to Prickle once the last line is dismissed.
+        self.portraits = {
+            "prickle": pygame.transform.scale_by(self.player.idleFrames[0], 1.3),
+            "feather": pygame.transform.scale_by(self.feathers.flyRFrames[0], 1.0),
+        }
+        self.speakerNames = {
+            "prickle": "Prickle",
+            "feather": "Feather",
+        }
+        self.dialogue = Dialogue()
+        self._showDialogue(
+            ["Hey! Where is my Golden Petal"],
+            speaker="prickle",
+            onDismiss=self._showFeatherTaunt,
+        )
+        self.feathersDeathDialogueShown = False
+
+    def _showDialogue(self, lines, speaker="prickle", style="center", next=None, onDismiss=None):
+        """Open the shared dialogue box, resolving a speaker key into this
+        scene's portrait/name. `next` is a convenience for the common case
+        (just set self.state once dismissed); pass a custom `onDismiss`
+        instead for chaining straight into another dialogue line, like the
+        opening back-and-forth below."""
+        def defaultOnDismiss():
+            self.player.controllable = True
+            if next is not None:
+                self.state = next
+
+        self.player.controllable = False
+        self.dialogue.show(
+            lines,
+            portrait=self.portraits.get(speaker),
+            name=self.speakerNames.get(speaker, speaker),
+            style=style,
+            onDismiss=onDismiss if onDismiss is not None else defaultOnDismiss,
+        )
+
+    def _showFeatherTaunt(self):
+        self._showDialogue(
+            ["Haha, You have to kill me to find out!"],
+            speaker="feather",
+            onDismiss=self._showPrickleReply,
+        )
+
+    def _showPrickleReply(self):
+        self._showDialogue(["Say less!"], speaker="prickle")
+
+    def _showFeatherDeathTaunt(self):
+        # Fires once, right after Feathers dies — see the isDead edge-check
+        # in update(). "Say less"->kill her, and now she gets one last word
+        # in on her way down.
+        self._showDialogue(
+            ["Tell me where is it!"],
+            speaker="prickle",
+            onDismiss=self._showFeatherDeathReply,
+        )
+
+    def _showFeatherDeathReply(self):
+        self._showDialogue(
+            ["You will never reach it!", "My nest is guarded by a poisonous branch at the top of the tree! "],
+            speaker="feather",
+        )
+
     def update(self):
         keys = pygame.key.get_pressed()
+
+        if self.dialogue.active:
+            self.dialogue.update(keys)
+            return
+
+        if self.player.hp <= 0 and self.state != "DEATH":
+            self.state = "DEATH"
+            self.deathTimer = self.deathDuration
+
+        if self.state == "DEATH":
+            self.updateDeathSequence(keys)
+            return
+
         prevRect = self.player.rect.copy()
 
         # Platform sticking, walking-along-surface, "S" drop-through, and
@@ -71,6 +188,7 @@ class Scene3:
         self.player.update(keys, platforms=self.platforms)
 
         self.handleWallCollisions(prevRect)
+        self.handleHazardCollisions()
 
         # Keep platforms/walls/nests anchored to the background art as the
         # camera scrolls (Player owns scrollY; this scene just reacts to it).
@@ -88,8 +206,73 @@ class Scene3:
 
         self.feathers.update(self.player, self.platforms)
 
+        if self.feathers.isDead and not self.feathersDeathDialogueShown:
+            self.feathersDeathDialogueShown = True
+            self._showFeatherDeathTaunt()
+
         self.bombs.update(self.platforms)
         self.handleBombHits()
+
+        self.updatePetal(keys)
+
+    def updatePetal(self, keys):
+        if self.petalCollected:
+            return
+
+        nest = self.nests[0]
+
+        if not nest.destroyed:
+            # Still resting visibly on top of the nest — just ride along
+            # with it as it scrolls (nest.rect.y is kept in sync with
+            # scrollY earlier in update()).
+            self.petalRect.center = (nest.rect.centerx, nest.rect.top + self.petalRestOffset)
+            return
+
+        if not self.petalFalling and not self.petalLanded:
+            # The nest just got destroyed this frame — let go and start
+            # falling from wherever it was actually sitting.
+            self.petalFalling = True
+
+        floor = self.platforms[0]  # the invisible floor strip, see __init__
+
+        if self.petalFalling:
+            prevBottom = self.petalRect.bottom
+            self.petalRect.y += self.petalFallSpeed
+
+            surfaceY = floor.topAt(self.petalRect.centerx)
+            if surfaceY is not None and prevBottom <= surfaceY and self.petalRect.bottom >= surfaceY:
+                self.petalRect.bottom = surfaceY
+                self.petalFalling = False
+                self.petalLanded = True
+                self.petalLandOffset = self.petalRect.bottom - floor.rect.y
+            elif self.petalRect.top > SCREEN_HEIGHT + 500:
+                # Safety net in case topAt ever misses (shouldn't happen —
+                # the floor spans the full screen width).
+                self.petalRect.bottom = SCREEN_HEIGHT
+                self.petalFalling = False
+                self.petalLanded = True
+                self.petalLandOffset = self.petalRect.bottom - floor.rect.y
+            return
+
+        if self.petalLanded:
+            self.petalRect.bottom = floor.rect.y + self.petalLandOffset
+
+            self.nearPetal = False
+            if self.player.rect.colliderect(self.petalRect.inflate(40, 40)):
+                distance = abs(self.player.rect.centerx - self.petalRect.centerx)
+                if distance < 60:
+                    self.nearPetal = True
+                    if keys[pygame.K_r]:
+                        self.petalCollected = True
+                        self.player.pickupItem_sound.play()
+
+    def updateDeathSequence(self, keys):
+        if self.deathTimer > 0:
+            self.deathTimer -= 1
+        # Keep Prickle's death animation playing (Player.update already
+        # branches on isDeath internally); everything else in the scene
+        # freezes so Feathers/bombs don't keep acting on a dead player.
+        self.player.update(keys, platforms=self.platforms)
 
     def handleBombHits(self):
         for bomb in list(self.bombs):
@@ -140,6 +323,25 @@ class Scene3:
                     bullet.kill()
                     break
 
+    def handleHazardCollisions(self):
+        if self.hazardDamageTimer > 0:
+            self.hazardDamageTimer -= 1
+
+        touchingHazard = any(
+            getattr(platform, "hazard", False) and platform.collidesRect(self.player.rect)
+            for platform in self.platforms
+        )
+
+        if touchingHazard:
+            if self.hazardDamageTimer <= 0:
+                self.player.takeDamage(1)
+                self.hazardDamageTimer = self.hazardDamageInterval
+        else:
+            # Not touching it anymore — reset so walking back onto it later
+            # starts a fresh 2-second countdown rather than picking up
+            # wherever the timer happened to be left off.
+            self.hazardDamageTimer = 0
+
     def handleWallCollisions(self, prevRect):
         for wall in self.walls:
             if not self.player.rect.colliderect(wall.rect):
@@ -167,8 +369,18 @@ class Scene3:
         for bomb in self.bombs:
             bomb.draw(screen)
 
+        if not self.petalCollected:
+            effects.drawPulseGlow(screen, self.petalRect.center)
+            screen.blit(self.petalImage, self.petalRect)
+            if self.nearPetal:
+                font = pygame.font.SysFont("Arial", 18)
+                text = font.render("Press R to pick up", True, YELLOW)
+                screen.blit(text, (self.petalRect.x - 20, self.petalRect.y - 30))
+
         screen.blit(self.player.image, self.player.rect)
         self.bullets.draw(screen)
         self.player.drawAmmo(screen)
         self.player.drawHP(screen)
         self.feathers.drawHP(screen)
+
+        self.dialogue.draw(screen)

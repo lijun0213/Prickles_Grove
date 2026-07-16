@@ -11,7 +11,7 @@ class Platform(pygame.sprite.Sprite):
     feels like landing on the branch itself, not an invisible box around it.
     """
 
-    def __init__(self, imagePath, x, y, angle=0, scale=1.0, blocksBullets=False, visible=True):
+    def __init__(self, imagePath, x, y, angle=0, scale=1.0, blocksBullets=False, visible=True, hazard=False):
         super().__init__()
         self.image = pygame.image.load(imagePath).convert_alpha()
 
@@ -26,6 +26,11 @@ class Platform(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
         self.blocksBullets = blocksBullets
         self.visible = visible
+        # A platform Prickle takes periodic damage from just by touching it
+        # (e.g. the spiky branch) rather than a one-shot hit like a bullet.
+        # The actual "damage every N seconds while in contact" timing is
+        # handled by the scene, not here — this is just the marker.
+        self.hazard = hazard
 
         self.baseY = self.rect.y
 
