@@ -82,7 +82,7 @@ class Game:
 
                 # --- Standard Menu Scene Starting Navigation ---
                 if event.key == pygame.K_SPACE:
-                    if self.current_scene == 0:
+                    if self.current_scene == 0 :
                         self.current_scene = 4
                         self.scene = Scene4()
                 
