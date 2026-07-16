@@ -38,6 +38,7 @@ class Scene0:
         # and gets teleported back to the start.
         self.pondLeft = 625
         self.pondRight = 850
+        self.splash_sound = pygame.mixer.Sound(r"scene0_assets/Splash sound.mp3")
 
         # Tutorial callouts — small one-shot hint boxes (no portrait), same
         # shared Dialogue component every scene uses. Each fires once, the
@@ -51,7 +52,7 @@ class Scene0:
         # Exit — reaching x=1270 lets Prickle press R to move on to Scene1.
         # levelComplete is the same signal Scene1 uses for its own Scene4
         # handoff — main.py watches for it to actually switch scenes.
-        self.exitX = 1270
+        self.exitX = 1200
         self.nearExit = False
         self.levelComplete = False
 
@@ -97,6 +98,7 @@ class Scene0:
         if not self.player.onGround:
             return
         if self.pondLeft < self.player.rect.centerx < self.pondRight:
+            self.splash_sound.play()
             self.player.rect.bottomleft = self.spawnPos
             self.player.velocityX = 0
             self.player.velocityY = 0

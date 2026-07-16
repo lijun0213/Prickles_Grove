@@ -83,8 +83,8 @@ class Game:
 
                 # --- Normal Gameplay Key Bindings ---
                 if event.key == pygame.K_SPACE and self.current_scene == 0:
-                    self.current_scene = 3
-                    self.scene = Scene3()
+                    self.current_scene = -1
+                    self.scene = Scene0()
 
     def restart_level(self):
         self.game_over = False
