@@ -83,8 +83,8 @@ class Game:
 
                 # --- Normal Gameplay Key Bindings ---
                 if event.key == pygame.K_SPACE and self.current_scene == 0:
-                    self.current_scene = 4
-                    self.scene = Scene4()
+                    self.current_scene = 3
+                    self.scene = Scene3()
 
     def restart_level(self):
         self.game_over = False
@@ -136,6 +136,15 @@ class Game:
 
             # Level completion transition
             if self.current_scene == 1:
+                if self.scene.levelComplete:
+                    pygame.mixer.music.stop()
+                    self.current_scene = 4
+                    self.scene = Scene4()
+            elif self.current_scene == -1:
+                if self.scene.levelComplete:
+                    self.current_scene = 1
+                    self.scene = Scene1()
+            elif self.current_scene == 3:
                 if self.scene.levelComplete:
                     pygame.mixer.music.stop()
                     self.current_scene = 4

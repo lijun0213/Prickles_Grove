@@ -1,24 +1,126 @@
 import pygame
 from settings import *
 from player import Player
+from dialogue import Dialogue
 
 class Scene0:
     def __init__(self):
+        # Background — a wide establishing shot, scaled to fill the screen
+        # height (same approach as Scene1's background) so it scrolls
+        # horizontally as Prickle walks instead of being squashed to fit.
+        self.bg = pygame.image.load(r"scene0_assets/scene 0 & 1.png").convert_alpha()
+        bgWidth, bgHeight = self.bg.get_size()
+        scale = SCREEN_HEIGHT / bgHeight
+        self.bg = pygame.transform.scale(self.bg, (int(bgWidth * scale), SCREEN_HEIGHT))
+        self.bgWidth = self.bg.get_width()
 
-        self.bg = pygame.image.load(r"scene1_assets/scene1_background.png").convert_alpha()
-        self.bg = pygame.transform.scale(self.bg,(SCREEN_WIDTH, SCREEN_HEIGHT * 3 // 4))
-        
-        self.player = Player()
+        # Camera restrictions
+        self.cameraX = 0
+        self.maxCameraX = max(0, self.bgWidth - SCREEN_WIDTH)
+ 
+        self.quillGroup = pygame.sprite.Group()
 
-        self.groundY = 500
-        self.player.rect.x = 100
+        # Instantiate Player, spawned on the left side of the screen.
+        self.player = Player(self.quillGroup, self.bgWidth)
+        self.player.bgWidth = self.bgWidth
+
+        self.groundY = SCREEN_HEIGHT - 95
+        self.player.rect.x = 60
         self.player.rect.bottom = self.groundY
         self.player.groundY = self.groundY
 
+        # Where Prickle respawns if he falls in the pond below.
+        self.spawnPos = self.player.rect.bottomleft
+
+        # Pond — a gap in the ground from world-x 625 to 850. Prickle has to
+        # jump clear across it; if he's still touching the ground (walked in,
+        # or came up short on the jump) anywhere in that span, he falls in
+        # and gets teleported back to the start.
+        self.pondLeft = 625
+        self.pondRight = 850
+
+        # Tutorial callouts — small one-shot hint boxes (no portrait), same
+        # shared Dialogue component every scene uses. Each fires once, the
+        # instant Prickle's world-x crosses its trigger point, and freezes
+        # the scene (see the top of update()) until dismissed.
+        self.dialogue = Dialogue()
+        self.sprintTipShown = False
+        self.jumpTipShown = False
+        self.pondTipShown = False
+
+        # Exit — reaching x=1270 lets Prickle press R to move on to Scene1.
+        # levelComplete is the same signal Scene1 uses for its own Scene4
+        # handoff — main.py watches for it to actually switch scenes.
+        self.exitX = 1270
+        self.nearExit = False
+        self.levelComplete = False
+
     def update(self):
         keys = pygame.key.get_pressed()
+
+        if self.dialogue.active:
+            self.dialogue.update(keys)
+            return
+
         self.player.update(keys)
+        self.quillGroup.update()
+        self.handlePond()
+        self.checkTutorialCallouts()
+        self.checkExit(keys)
+        self.updateCamera()
+
+    def checkExit(self, keys):
+        if self.levelComplete:
+            return
+
+        self.nearExit = abs(self.player.rect.centerx - self.exitX) < 60
+
+        if self.nearExit and keys[pygame.K_r]:
+            self.levelComplete = True
+
+    def checkTutorialCallouts(self):
+        x = self.player.rect.centerx
+        if not self.sprintTipShown and x >= 275:
+            self.sprintTipShown = True
+            self.dialogue.show(["Hold LSHIFT to sprint!"], style="callout")
+            return
+        if not self.jumpTipShown and x >= 475:
+            self.jumpTipShown = True
+            self.dialogue.show(["Hold SPACE to jump!"], style="callout")
+            return
+        if not self.pondTipShown and x >= 500:
+            self.pondTipShown = True
+            self.dialogue.show(["Sprint and Jump past this pond!"], style="callout")
+            return
+
+    def handlePond(self):
+        if not self.player.onGround:
+            return
+        if self.pondLeft < self.player.rect.centerx < self.pondRight:
+            self.player.rect.bottomleft = self.spawnPos
+            self.player.velocityX = 0
+            self.player.velocityY = 0
+
+    def updateCamera(self):
+        self.cameraX = self.player.rect.centerx - SCREEN_WIDTH // 2
+        self.cameraX = max(0, min(self.cameraX, self.maxCameraX))
+        self.player.cameraX = self.cameraX
 
     def draw(self, screen):
-        screen.blit(self.bg, (0, 0))
-        screen.blit(self.player.image, self.player.rect)
+        screen.blit(self.bg, (-self.cameraX, 0))
+
+        screen.blit(self.player.image, (self.player.rect.x - self.cameraX, self.player.rect.y))
+        for quill in self.quillGroup:
+            screen.blit(quill.image, (quill.rect.x - self.cameraX, quill.rect.y))
+
+        self.player.drawAmmo(screen)
+        self.player.drawHP(screen)
+
+        if self.nearExit and not self.levelComplete:
+            font = pygame.font.SysFont("Arial", 18)
+            text = font.render("Press R to Enter", True, YELLOW)
+            textX = self.player.rect.centerx - self.cameraX - text.get_width() // 2
+            textY = self.player.rect.top - 30
+            screen.blit(text, (textX, textY))
+
+        self.dialogue.draw(screen)

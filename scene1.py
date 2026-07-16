@@ -317,9 +317,9 @@ class Scene1:
 
         # Draw Enemy Hurt
         for enemy in self.enemies:
-            is_dead = enemy.isDead or enemy.raccoonConfessed
+            is_dead = getattr(enemy, 'isDead', False) or getattr(enemy, 'raccoonConfessed', False)
 
-            if enemy.flash_timer > 0 and not is_dead:
+            if getattr(enemy, 'flash_timer', 0) > 0 and not is_dead:
                 flash_surf = enemy.image.copy()
                 flash_surf.fill((255, 50, 50, 255), special_flags=pygame.BLEND_RGBA_MULT)
                 screen.blit(flash_surf, (enemy.rect.x - self.cameraX, enemy.rect.y))

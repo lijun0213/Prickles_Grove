@@ -719,8 +719,17 @@ class Bomb(pygame.sprite.Sprite):
     background (no real alpha), so each frame gets colorkeyed to punch out
     the black before it's usable as a sprite."""
 
+    # Loaded once and shared across every Bomb instance (rather than
+    # re-decoding the file from disk on every single drop — Feathers can
+    # spawn a new one every ~1-2 seconds).
+    _explodeSound = None
+
     def __init__(self, x, y, speed=4, damage=1, scale=0.3, animSpeed=8, explosionFrameIndex=5, targetPlatform=None):
         super().__init__()
+
+        if Bomb._explodeSound is None:
+            Bomb._explodeSound = pygame.mixer.Sound(r"feather_assets/bomb sound.mp3")
+        self.explodeSound = Bomb._explodeSound
 
         sheet = pygame.image.load(r"feather_assets/egg bomb.png").convert()
         numFrames = 10
@@ -828,8 +837,9 @@ class Bomb(pygame.sprite.Sprite):
                 return
 
             self.animIndex += 1
-            if self.animIndex >= self.explosionFrameIndex:
+            if self.animIndex >= self.explosionFrameIndex and not self.exploded:
                 self.exploded = True
+                self.explodeSound.play()
 
         self.image = self.currentFrames[self.animIndex]
 
@@ -891,6 +901,11 @@ class Feathers(Enemy):
         self.isHurt = False
         self.hurtTimer = 0
         self.hurtDuration = 15
+
+        # Hurt sound — same per-instance load pattern as Raccoon's
+        # raccoon_whimper. Feathers is only ever created once per scene, so
+        # there's no need for Bomb's shared-class-attribute caching trick.
+        self.hurt_sound = pygame.mixer.Sound(r"feather_assets/bird_hurt.mp3")
 
         # feather_dead.png, unlike hurt/bomb, already has a real alpha
         # channel (checked — no opaque black background), so it just needs
@@ -991,6 +1006,7 @@ class Feathers(Enemy):
     def takeDamage(self, damage):
         super().takeDamage(damage)
         self.flashTimer = self.flashFrames
+        self.hurt_sound.play()
         if self.hp > 0:
             self.isHurt = True
             self.hurtTimer = self.hurtDuration

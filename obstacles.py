@@ -221,6 +221,9 @@ class Nest(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
         self.baseY = self.rect.y  # see Platform.baseY
 
+        # Hit sound — same per-instance load pattern as Feathers' hurt_sound.
+        self.hit_sound = pygame.mixer.Sound(r"feather_assets/nest_sound.mp3")
+
     def _brightFrame(self, frameIndex):
         bright = self._brightCache.get(frameIndex)
         if bright is None:
@@ -241,6 +244,7 @@ class Nest(pygame.sprite.Sprite):
         self.hitsTaken += 1
         self.frameIndex = min(self.hitsTaken, len(self.frames) - 1)
         self.flashTimer = self.flashFrames
+        self.hit_sound.play()
 
         if self.hitsTaken >= self.maxHits:
             self.destroyed = True

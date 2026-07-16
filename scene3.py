@@ -119,6 +119,15 @@ class Scene3:
         )
         self.feathersDeathDialogueShown = False
 
+        # Fade-to-black transition into Scene4, triggered the instant the
+        # petal is actually picked up (see updatePetal). levelComplete is
+        # the same signal Scene1/Scene0 use for their own scene handoffs —
+        # main.py watches for it to switch to Scene4 once the fade finishes.
+        self.levelComplete = False
+        self.fading = False
+        self.fadeTimer = 0
+        self.fadeDuration = 60  # 1 second at 60fps
+
     def _showDialogue(self, lines, speaker="prickle", style="center", next=None, onDismiss=None):
         """Open the shared dialogue box, resolving a speaker key into this
         scene's portrait/name. `next` is a convenience for the common case
@@ -163,6 +172,15 @@ class Scene3:
         self._showDialogue(
             ["You will never reach it!", "My nest is guarded by a poisonous branch at the top of the tree! "],
             speaker="feather",
+            onDismiss=self._showClimbTip,
+        )
+
+    def _showClimbTip(self):
+        # One-shot tutorial callout, chained onto the end of the post-death
+        # dialogue — no portrait/speaker, just a small corner hint box.
+        self._showDialogue(
+            ["Climb the trees and destroy the nest"],
+            style="callout",
         )
 
     def update(self):
@@ -170,6 +188,10 @@ class Scene3:
 
         if self.dialogue.active:
             self.dialogue.update(keys)
+            return
+
+        if self.fading:
+            self.updateFade()
             return
 
         if self.player.hp <= 0 and self.state != "DEATH":
@@ -265,6 +287,12 @@ class Scene3:
                     if keys[pygame.K_r]:
                         self.petalCollected = True
                         self.player.pickupItem_sound.play()
+                        self.fading = True
+
+    def updateFade(self):
+        self.fadeTimer += 1
+        if self.fadeTimer >= self.fadeDuration:
+            self.levelComplete = True
 
     def updateDeathSequence(self, keys):
         if self.deathTimer > 0:
@@ -384,3 +412,9 @@ class Scene3:
         self.feathers.drawHP(screen)
 
         self.dialogue.draw(screen)
+
+        if self.fading:
+            alpha = int(255 * min(1, self.fadeTimer / self.fadeDuration))
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, alpha))
+            screen.blit(overlay, (0, 0))
