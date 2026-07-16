@@ -125,3 +125,40 @@ def drawTeleportPuff(screen, center, camera_x=0, color=(255, 220, 255)):
         alpha = max(0, 200 - r * 4)
         pygame.draw.circle(surf, (*color, alpha), (40, 40), r, width=2)
     screen.blit(surf, (cx - 40, cy - 40))
+
+
+class HitShockwave(pygame.sprite.Sprite):
+    def __init__(self, x, y, max_radius=60, color=(255, 215, 0)):  # Defaults to a Golden Honey ring
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.radius = 10
+        self.max_radius = max_radius
+        self.grow_speed = 3
+        self.color = color
+        self.alpha = 255
+        
+        # Create a surface large enough to contain the final ring size
+        self.image = pygame.Surface((max_radius * 2, max_radius * 2), pygame.SRCALPHA)
+        self.rect = self.image.get_rect(center=(self.x, self.y))
+
+    def update(self):
+        # Grow the ring outward over time
+        self.radius += self.grow_speed
+        
+        # Calculate fade out ratio as it expands
+        progress = (self.radius - 10) / (self.max_radius - 10)
+        self.alpha = max(0, int(255 * (1.0 - progress)))
+        
+        # Redraw surface frame cleanly
+        self.image.fill((0, 0, 0, 0))
+        if self.alpha > 0 and self.radius < self.max_radius:
+            # Draw a thick outer ring and a thinner soft inner accent ring
+            pygame.draw.circle(self.image, (*self.color, self.alpha), (self.max_radius, self.max_radius), int(self.radius), width=3)
+            pygame.draw.circle(self.image, (255, 255, 255, int(self.alpha * 0.5)), (self.max_radius, self.max_radius), max(1, int(self.radius - 4)), width=1)
+        else:
+            self.kill() # Instantly remove from all tracking groups once faded out
+
+    def draw(self, screen, cameraX):
+        # Keeps the effect pinned to the game world space relative to camera scroll
+        screen.blit(self.image, (self.rect.x - cameraX, self.rect.y))

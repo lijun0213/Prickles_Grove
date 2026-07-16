@@ -71,10 +71,10 @@ class Wasp(Enemy):
                 frames.append(frame)
             return frames
 
-        self.idleRFrames = extractFrames(waspIdle, 4)
-        self.idleLFrames = [pygame.transform.flip(f, True, False) for f in self.idleRFrames]
-        self.attackRFrames = extractFrames(waspAttack, 7)
-        self.attackLFrames = [pygame.transform.flip(f, True, False) for f in self.attackRFrames]
+        self.idleLFrames = extractFrames(waspIdle, 4)
+        self.idleRFrames = [pygame.transform.flip(f, True, False) for f in self.idleLFrames]
+        self.attackLFrames = extractFrames(waspAttack, 7)
+        self.attackRFrames = [pygame.transform.flip(f, True, False) for f in self.attackLFrames]
 
         # Animation
         self.currentFrames = self.idleRFrames
@@ -108,6 +108,10 @@ class Wasp(Enemy):
         self.isHurt = False
         self.hurtTimer = 0
         self.hurtDuration = 15 
+
+        self.buzz_sound = pygame.mixer.Sound(r"scene4_assets/wasp_buzz.mp3")
+        self.buzz_sound.set_volume(0.3)
+        self.buzzCooldown = 0
             
     def pickWanderTarget(self):
         margin = 60
@@ -175,6 +179,21 @@ class Wasp(Enemy):
             player.takeDamage(self.attackDamage) 
             self.attackCooldown = self.attackCooldownMax
     
+    def updateBuzz(self, player):
+        distance = pygame.math.Vector2(
+            self.rect.center
+        ).distance_to(
+            player.rect.center
+        )
+
+        if distance < 250:
+            if self.buzzCooldown <= 0:
+                self.buzz_sound.play()
+                self.buzzCooldown = 90  # frames
+
+        if self.buzzCooldown > 0:
+            self.buzzCooldown -= 1
+
     def animate(self):
         if self.isAttacking:
             newFrames = self.attackRFrames if self.facingRight else self.attackLFrames
@@ -261,6 +280,10 @@ class WaspQueen(Enemy):
         self.shakeTimer = 0
         self.shakeDuration = 12
         self.shakeMagnitude = 6
+
+        self.buzz_sound = pygame.mixer.Sound(r"scene4_assets/wasp_buzz.mp3")
+        self.buzz_sound.set_volume(0.3)
+        self.buzzCooldown = 0
 
     def takeDamage(self, damage):
         if self.teleporting or self.hp <= 0:
@@ -358,6 +381,21 @@ class WaspQueen(Enemy):
             self.teleporting = False
             self.teleportPhase = None
             self.idleTeleportCooldown = 0
+
+    def updateBuzz(self, player):
+        distance = pygame.math.Vector2(
+            self.rect.center
+        ).distance_to(
+            player.rect.center
+        )
+
+        if distance < 250:
+            if self.buzzCooldown <= 0:
+                self.buzz_sound.play()
+                self.buzzCooldown = 90  # frames
+
+        if self.buzzCooldown > 0:
+            self.buzzCooldown -= 1
 
     def animate(self):
         if self.isAttacking:

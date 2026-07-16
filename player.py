@@ -1,6 +1,6 @@
 import pygame
 from settings import SCREEN_WIDTH, SCREEN_HEIGHT
-
+from effects import drawPulseGlow
 pygame.init()
 
 
@@ -19,6 +19,8 @@ class Player(pygame.sprite.Sprite):
         prickleAttack = pygame.transform.scale_by(prickleAttack, 1.2)
         prickleHurt= pygame.image.load(r"player_assets/prickle_hurt.png").convert_alpha()
         prickleHurt = pygame.transform.scale_by(prickleHurt, 1.2)
+        prickleDeath = pygame.image.load(r"player_assets/prickle_death.png").convert_alpha()
+        prickleDeath = pygame.transform.scale_by(prickleDeath, 1.2)
 
         self.quillGroup = quillGroup
 
@@ -62,18 +64,22 @@ class Player(pygame.sprite.Sprite):
         prickleAttackLFrames = [pygame.transform.flip(f, True, False) for f in prickleAttackRFrames]
         prickleHurtRFrames = extractFrames (prickleHurt, 3)
         prickleHurtLFrames = [pygame.transform.flip(f, True, False) for f in prickleHurtRFrames]
+        prickleDeathRFrames = extractFrames (prickleDeath, 2)
+        prickleDeathLFrames = [pygame.transform.flip(f, True, False) for f in prickleDeathRFrames]
 
         self.animations = {
-            'idle'       : prickleIdleRFrames,
-            'idle_left'  : prickleIdleLFrames,
-            'walk_right' : prickleWalkRFrames,
-            'walk_left'  : prickleWalkLFrames,
-            'run_right' : prickleRunRFrames,
-            'run_left'  : prickleRunLFrames,
-            'attack_right': prickleAttackRFrames,
-            'attack_left' : prickleAttackLFrames,
-            'hurt_right': prickleHurtRFrames,
-            'hurt_left' : prickleHurtLFrames
+            'idle'          : prickleIdleRFrames,
+            'idle_left'     : prickleIdleLFrames,
+            'walk_right'    : prickleWalkRFrames,
+            'walk_left'     : prickleWalkLFrames,
+            'run_right'     : prickleRunRFrames,
+            'run_left'      : prickleRunLFrames,
+            'attack_right'  : prickleAttackRFrames,
+            'attack_left'   : prickleAttackLFrames,
+            'hurt_right'    : prickleHurtRFrames,
+            'hurt_left'     : prickleHurtLFrames,
+            'death_right'   : prickleDeathRFrames,
+            'death_left'    : prickleDeathLFrames
         }
 
         self.idleFrames = prickleIdleRFrames
@@ -86,6 +92,8 @@ class Player(pygame.sprite.Sprite):
         self.attackLeftFrames = prickleAttackLFrames
         self.hurtRightFrames = prickleHurtRFrames
         self.hurtLeftFrames = prickleHurtLFrames
+        self.deathRightFrames = prickleDeathRFrames
+        self.deathLeftFrames = prickleDeathLFrames
         
         # animation
         self.currentFrames = self.idleFrames
@@ -141,6 +149,8 @@ class Player(pygame.sprite.Sprite):
         self.maxHP = 3
         self.hp = self.maxHP
 
+        self.isDeath = False
+
         self.isHurt = False
         self.hurtTimer = 0
         self.hurtDuration = 15
@@ -183,7 +193,7 @@ class Player(pygame.sprite.Sprite):
 
         if self.controllable:
             self.move(keys)
-
+        
         if platforms:
             self.handlePlatforms(platforms, prevBottom, wasGrounded)
 
@@ -196,6 +206,10 @@ class Player(pygame.sprite.Sprite):
 
         self.handleAmmo()
         self.handleAttack()
+
+        if self.isDeath:
+            self.animate(keys)
+            return
 
         if self.isHurt:
             self.hurtTimer -= 1
@@ -434,6 +448,8 @@ class Player(pygame.sprite.Sprite):
 
         if self.hp <= 0:
             self.hp = 0
+            self.isDeath = True
+            self.controllable = False
             print("Player Dead")
 
     def applyParalysis(self, duration):
@@ -444,14 +460,14 @@ class Player(pygame.sprite.Sprite):
     def animate(self, keys):
         if self.direction == 1:
             newFrames = self.runningRightFrames if self.isRunning else self.walkingRightFrames
-
         elif self.direction == -1:
             newFrames = self.runningLeftFrames if self.isRunning else self.walkingLeftFrames
-
         else:
             newFrames = self.idleFrames if self.facingRight else self.idleLeftFrames
 
-        if self.isHurt:
+        if self.isDeath:
+            newFrames = self.deathRightFrames if self.facingRight else self.deathLeftFrames         
+        elif self.isHurt:
             newFrames = self.hurtRightFrames if self.facingRight else self.hurtLeftFrames
         elif self.direction == 1:
             newFrames = self.runningRightFrames if self.isRunning else self.walkingRightFrames
@@ -536,3 +552,44 @@ class Quill(pygame.sprite.Sprite):
         # remove after leaving world
         if (self.x < -100 or self.x > 5000 or self.y < -100 or self.y > 2000):
             self.kill()
+            
+
+
+class PickupItem(pygame.sprite.Sprite):
+    def __init__(self, x, y, image_path, popup_lines, title="System", target_state=None, interaction_distance=60):
+        super().__init__()
+        self.image = pygame.image.load(image_path).convert_alpha()
+        self.rect = self.image.get_rect(topleft=(x, y))
+        
+        self.popup_lines = popup_lines
+        self.popup_title = title
+        self.target_state = target_state
+        self.interaction_distance = interaction_distance
+        
+        self.collected = False
+        self.is_near_player = False
+        self.font = pygame.font.SysFont("Arial", 18)
+
+    def draw(self, screen, camera_x, yellow_color=(255, 255, 0)):
+        if self.collected:
+            return
+
+        cx = self.rect.centerx - camera_x
+        cy = self.rect.centery
+        render_x = self.rect.x - camera_x
+        render_y = self.rect.y
+
+        # Pulse Glow
+        size = 100
+        pulse = 4 + int(4 * abs(pygame.time.get_ticks() % 1000 - 500) / 500)
+        glow_surface = pygame.Surface((size, size), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surface, (150, 220, 255, 90), (size // 2, size // 2), 32 + pulse)
+        screen.blit(glow_surface, (cx - size // 2, cy - size // 2))
+
+        # Item Texture
+        screen.blit(self.image, (render_x, render_y))
+
+        # Interaction Text
+        if self.is_near_player:
+            text_surf = self.font.render("Press R to pick up", True, yellow_color)
+            screen.blit(text_surf, (render_x - 20, render_y - 30))

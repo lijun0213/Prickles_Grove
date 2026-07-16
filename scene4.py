@@ -29,10 +29,12 @@ class Scene4:
         # 2. Distribute platforms across the long scrolling horizon sequence
         self.platforms = [
             Platform(r"scene4_assets/flower_platform1.png", x=80, y=380, scale=0.5),
-            MovingPlatform(r"scene4_assets/flower_platform1.png", x=400, y=380, scale=0.5, moveRange=100, speed=2, axis='X'),
+            Platform(r"scene4_assets/flower_platform1.png", x=200, y=240, scale=0.5),
+            Platform(r"scene4_assets/vine1.png", x=230, y=260, scale=0.7),
+            MovingPlatform(r"scene4_assets/flower_platform2.png", x=400, y=380, scale=0.5, moveRange=100, speed=2, axis='X'),
             Platform(r"scene4_assets/flower_platform1.png", x=750, y=320, scale=0.5),
-            MovingPlatform(r"scene4_assets/flower_platform1.png", x=1050, y=380, scale=0.5, moveRange=100, speed=1.5, axis='Y'),
-            Platform(r"scene4_assets/flower_platform1.png", x=1100, y=380, scale=0.5),
+            MovingPlatform(r"scene4_assets/flower_platform2.png", x=1050, y=100, scale=0.5, moveRange=70, speed=1.5, axis='Y'),
+            MovingPlatform(r"scene4_assets/flower_platform2.png", x=1050, y=380, scale=0.5, moveRange=100, speed=1.5, axis='Y'),
             Platform(r"scene4_assets/flower_platform1.png", x=1450, y=280, scale=0.5),
         ]
 
@@ -49,6 +51,7 @@ class Scene4:
         self.bossGroup.add(self.boss)
         self.stings = pygame.sprite.Group()
         self.boss.stingGroup = self.stings 
+        self.bossEffects = pygame.sprite.Group()
 
         # Wave tracking
         self.wasps = pygame.sprite.Group()
@@ -82,8 +85,13 @@ class Scene4:
         self.deathTimer = 0
         self.deathDuration = 120 # ~2 seconds for animation sequence to unfold
 
+        # background music
+        pygame.mixer.music.load(r"scene4_assets/scene4_bgmusic.mp3")
+        pygame.mixer.music.set_volume(0.2) 
+        pygame.mixer.music.play(loops=-1)
+
+
     def spawnWaspWave(self):
-        """Spawns a swarm contextually anchored near the scrolling arena section."""
         self.wasps.empty()
         numWasps = self.waveConfigurations[self.currentWaveIndex]
         
@@ -101,14 +109,11 @@ class Scene4:
         # Check death trigger immediately before processing state engine vectors
         if self.player.hp <= 0 and self.state != "DEATH":
             self.state = "DEATH"
+            self.player.isDeath = True
             self.player.controllable = False
-            self.deathTimer = self.deathDuration
+            self.deathTimer = 0
             # If your Player class has a death sound, trigger it here:
             # self.player.death_sound.play()
-
-        if self.state == "DEATH":
-            self.updateDeathSequence()
-            return
 
         if self.showPopup:
             self.updatePopup(keys)
@@ -126,6 +131,8 @@ class Scene4:
         self.quills.update()
         self.updateCamera() # Keep camera locked precisely to current position frame-by-frame
 
+        self.bossEffects.update()
+
         if self.player.onGround:
             self.lastSafePos = self.player.rect.midbottom
         if self.player.rect.top > SCREEN_HEIGHT + 50:
@@ -137,23 +144,6 @@ class Scene4:
             self.updateBossFight()
         elif self.state == "VICTORY":
             self.updateVictory(keys)
-
-    def updateDeathSequence(self):
-        """Processes death sequence timers and tracks animations independently of controls."""
-        self.deathTimer -= 1
-        # Force player object to switch into internal death frame sequence indexes
-        if hasattr(self.player, 'animate_death'):
-            self.player.animate_death()
-        elif hasattr(self.player, 'deathFrames'):
-            # Fallback frame switcher logic manually over local variables
-            self.player.image = self.player.deathFrames[min(
-                len(self.player.deathFrames) - 1, 
-                (self.deathDuration - self.deathTimer) // 10
-            )]
-        
-        if self.deathTimer <= 0:
-            # Reload loop or trigger reset game signals contextually here
-            self.__init__() 
 
     def updateCamera(self):
         """Updates internal center coordinates relative to modern long map styles."""
@@ -169,7 +159,11 @@ class Scene4:
 
     def updateSwarm(self):
         self.boss.update(self.player, active=False)
+        self.boss.updateBuzz(self.player)
+
         self.wasps.update(self.player)
+        for wasp in self.wasps:
+            wasp.updateBuzz(self.player)
 
         for quill in list(self.quills):
             if quill.rect.colliderect(self.boss.rect):
@@ -194,6 +188,8 @@ class Scene4:
 
     def updateBossFight(self):
         self.boss.update(self.player, active=True)
+        self.boss.updateBuzz(self.player)
+
         self.stings.update()
 
         for sting in list(self.stings):
@@ -206,6 +202,11 @@ class Scene4:
 
         for quill in list(self.quills):
             if quill.rect.colliderect(self.boss.rect) and not self.boss.teleporting:
+                self.boss.takeDamage(1)
+                self.boss.shakeTimer = 15      
+                self.boss.shakeMagnitude = 6                   
+                wave = effects.HitShockwave(quill.rect.centerx, quill.rect.centery, max_radius=70)
+                self.bossEffects.add(wave)
                 self.boss.takeDamage(1)
                 effects.create_impact_burst(quill.rect.center)
                 quill.kill()
@@ -273,7 +274,6 @@ class Scene4:
                 self.state = next_phase
 
     def draw(self, screen):
-        # Apply camera offset to every landscape object drawn onto the display context
         screen.blit(self.bg, (-self.cameraX, 0))  
 
         for platform in self.platforms:
@@ -320,6 +320,9 @@ class Scene4:
         
         for quill in self.quills:
             screen.blit(quill.image, (quill.rect.x - self.cameraX, quill.rect.y))
+
+        for effect in self.bossEffects:
+            effect.draw(screen, self.cameraX)
 
         # Interface Overlays (Drawn natively directly on viewport base vectors)
         self.player.drawAmmo(screen)
