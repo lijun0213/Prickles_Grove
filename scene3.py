@@ -25,10 +25,16 @@ class Scene3:
         # following him upward instead of letting him keep climbing off the
         # top of the screen. (Camera-follow itself now lives in Player —
         # see Player.updateCamera — this just opts this scene into it.)
-        self.player.cameraFollowY = 125
+        self.player.cameraFollowY = 365
 
 
         self.platforms = [
+            # Floor strip along the bottom of the screen — invisible (not
+            # drawn), just a collision surface so falling bombs (and
+            # Prickle) land on solid ground instead of passing through.
+            # floor.png is a thin 500x3 sliver, stretched to span the full
+            # screen width but kept at its native (near-zero) thickness.
+            Platform(r"scene3_assets/floor.png", x=0, y=SCREEN_HEIGHT - 3, scale=(SCREEN_WIDTH / 500, 1), visible=False),
             Platform(r"scene3_assets/branch_right.png", x=240, y=300, angle=22, scale = (2.2, 1.3)),
             Platform(r"scene3_assets/bridge.png", x=92, y=190, scale = (1.23, 1.1)),
             Platform(r"scene3_assets/branch_left.png", x=75, y=70, angle=22, scale = (1.7, 1.3)),
@@ -51,7 +57,9 @@ class Scene3:
         # Feathers — the Scene 3 boss. Flies left/right randomly and hovers
         # a fixed distance above wherever Prickle currently is, so he's
         # always overhead as Prickle climbs toward the nest.
-        self.feathers = Feathers(x=400, y=-350, hp=10, hoverOffset=250, wanderRange=150)
+        self.bombs = pygame.sprite.Group()
+        self.feathers = Feathers(x=400, y=-350, bombGroup=self.bombs, hp=10, hoverOffset=250, wanderRange=150,
+                                  bombIntervalSeconds=1)
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -78,11 +86,35 @@ class Scene3:
         self.bullets.update()
         self.handleBulletHits()
 
-        self.feathers.update(self.player)
+        self.feathers.update(self.player, self.platforms)
+
+        self.bombs.update(self.platforms)
+        self.handleBombHits()
+
+    def handleBombHits(self):
+        for bomb in list(self.bombs):
+            # Only the explosion itself can hurt Prickle — not the fall,
+            # not just sitting landed with its fuse burning. hasDealtDamage
+            # keeps this a one-time hit rather than damage every frame the
+            # blast/smoke animation is playing. The bomb removes itself
+            # once its animation finishes (see Bomb.animate).
+            if not bomb.exploded or bomb.hasDealtDamage:
+                continue
+            if bomb.rect.colliderect(self.player.rect):
+                self.player.takeDamage(bomb.damage)
+                bomb.hasDealtDamage = True
 
     def handleBulletHits(self):
         for bullet in list(self.bullets):
             hit = False
+
+            # Feathers herself — same takeDamage/HP pattern as Raccoon in
+            # Scene1 (both inherit it from Enemy), just a direct rect check
+            # here since there's only the one enemy rather than a group.
+            if self.feathers.hp > 0 and bullet.rect.colliderect(self.feathers.rect):
+                self.feathers.takeDamage(1)
+                bullet.kill()
+                continue
 
             for nest in self.nests:
                 if nest.destroyed:
@@ -131,9 +163,12 @@ class Scene3:
         for nest in self.nests:
             nest.draw(screen)
 
-        screen.blit(self.feathers.image, self.feathers.rect)
+        self.feathers.draw(screen)
+        for bomb in self.bombs:
+            bomb.draw(screen)
 
         screen.blit(self.player.image, self.player.rect)
         self.bullets.draw(screen)
         self.player.drawAmmo(screen)
         self.player.drawHP(screen)
+        self.feathers.drawHP(screen)

@@ -14,10 +14,10 @@ class Enemy(pygame.sprite.Sprite):
         self.maxHP = hp
         self.hp = hp
 
-        self.enemy_hpFull = pygame.image.load(r"player_assets/enemy_hpFull.png").convert_alpha()
-        self.enemy_hpFull = pygame.transform.scale_by(self.enemy_hpFull, 4.5)
-        self.enemy_hpEmpty = pygame.image.load(r"player_assets/enemy_hpEmpty.png").convert_alpha()
-        self.enemy_hpEmpty = pygame.transform.scale_by(self.enemy_hpEmpty, 4.5)
+        self.enemy_hpFull = pygame.image.load(r"enemy_assets/enemy_hpFull.png").convert_alpha()
+        self.enemy_hpFull = pygame.transform.scale_by(self.enemy_hpFull, 3.15)
+        self.enemy_hpEmpty = pygame.image.load(r"enemy_assets/enemy_hpEmpty.png").convert_alpha()
+        self.enemy_hpEmpty = pygame.transform.scale_by(self.enemy_hpEmpty, 3.15)
 
     def takeDamage(self, damage):
         self.hp -= damage
@@ -29,9 +29,9 @@ class Enemy(pygame.sprite.Sprite):
     def drawHP(self, screen):
         hpX = 590
         hpY = 10
-        spacingX = 65
+        spacingX = 45
         spacingY = 50
-        perRow = 3
+        perRow = 4
 
         for i in range(self.maxHP):
 
@@ -445,9 +445,167 @@ class Raccoon(Enemy):
         self.rect.midbottom = oldMidBottom
 
 
+def _findLandingSurface(rect, prevBottom, platforms):
+    """Shared 'landing from above' search — same shape as
+    Player.handlePlatforms: use each platform's actual drawn surface
+    (topAt), not its bounding box, and return whichever one the falling
+    rect would hit first. Used by both Bomb and Feathers' death-fall, so a
+    rotated/irregular platform (or the invisible floor strip) is landed on
+    the same way everywhere. Returns (platform, landY), both None if
+    nothing was hit this frame."""
+    bestPlatform = None
+    bestLandY = None
+
+    for platform in platforms:
+        if not rect.colliderect(platform.rect):
+            continue
+
+        surfaceY = platform.topAt(rect.centerx)
+        if surfaceY is None:
+            continue
+
+        landingFromAbove = prevBottom <= surfaceY and rect.bottom >= surfaceY
+        if landingFromAbove and (bestLandY is None or surfaceY < bestLandY):
+            bestPlatform = platform
+            bestLandY = surfaceY
+
+    return bestPlatform, bestLandY
+
+
+class Bomb(pygame.sprite.Sprite):
+    """An egg bomb Feathers drops — falls straight down, animating through
+    its frames, and damages Prickle on contact. egg bomb.png is a 10-frame
+    sheet (3000x300, so 300x300px square frames) with an opaque black
+    background (no real alpha), so each frame gets colorkeyed to punch out
+    the black before it's usable as a sprite."""
+
+    def __init__(self, x, y, speed=4, damage=1, scale=0.3, animSpeed=8, explosionFrameIndex=5, targetPlatform=None):
+        super().__init__()
+
+        sheet = pygame.image.load(r"feather_assets/egg bomb.png").convert()
+        numFrames = 10
+        sheetWidth = sheet.get_width()
+        frameHeight = sheet.get_height()
+
+        # 3000 / 10 = 300 exactly, so equal-width slicing lines up cleanly
+        # with no drift — still computing each boundary independently from
+        # the total (rather than accumulating a stride) so this stays safe
+        # if the sheet is ever swapped for one that doesn't divide evenly.
+        frames = []
+        for i in range(numFrames):
+            startX = round(i * sheetWidth / numFrames)
+            endX = round((i + 1) * sheetWidth / numFrames)
+            frame = sheet.subsurface(pygame.Rect(startX, 0, endX - startX, frameHeight)).copy()
+            frame.set_colorkey((0, 0, 0))
+            frame = frame.convert_alpha()
+            if scale != 1.0:
+                frame = pygame.transform.scale_by(frame, scale)
+            frames.append(frame)
+
+        # Same animation pattern as Player.animate(): a currentFrames list,
+        # animIndex/animTimer/animSpeed driving a looping timer-based
+        # advance, and the rect rebuilt from the new image each time while
+        # re-anchoring on midbottom — so if frame sizes differ by a pixel or
+        # two (they do here, since 13 doesn't divide the sheet evenly), the
+        # sprite stays consistently positioned instead of drifting.
+        self.currentFrames = frames
+        self.animIndex = 0
+        self.animTimer = 0
+        self.animSpeed = animSpeed
+
+        self.image = self.currentFrames[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.speed = speed
+        self.damage = damage
+
+        # Falls untouched (no animation yet) until it lands on a platform.
+        # egg bomb.png's 10 frames are actually three phases: 0-4 is the
+        # fuse burning down, explosionFrameIndex (5) onward is the actual
+        # blast, and the last couple are the smoke clearing. So instead of
+        # an arbitrary tick countdown, the explosion (and the hit) is tied
+        # to the animation itself reaching that blast frame — it always
+        # looks right regardless of animSpeed. hasDealtDamage makes sure
+        # the hit only lands once during the blast, not every frame of it.
+        self.landed = False
+        self.exploded = False
+        self.explosionFrameIndex = min(explosionFrameIndex, len(self.currentFrames) - 1)
+        self.hasDealtDamage = False
+
+        # If Feathers dropped this while Prickle was standing on a specific
+        # platform, it should only ever land on THAT one (and stay there
+        # until it explodes) rather than whichever platform it happens to
+        # pass over first — otherwise it can land somewhere Prickle never
+        # even was. None (e.g. Prickle was airborne when it dropped) falls
+        # back to the old "land on whatever's below it" behavior.
+        self.targetPlatform = targetPlatform
+
+        # The platform actually landed on, plus the bomb's fixed vertical
+        # offset from that platform's rect (captured the instant it lands).
+        # Platforms get re-positioned every frame by Scene3 as the camera
+        # scrolls (rect.y = baseY + scrollY) — re-deriving the bomb's y from
+        # landedPlatform.rect.y + landOffset each frame keeps it locked to
+        # that exact spot on the platform through any amount of scrolling,
+        # instead of staying pinned to a fixed screen position while the
+        # platform (and everything else) scrolls out from under it.
+        self.landedPlatform = None
+        self.landOffset = 0
+
+    def update(self, platforms=None):
+        if not self.landed:
+            prevBottom = self.rect.bottom
+            self.rect.y += self.speed
+
+            if self.targetPlatform is not None:
+                self._checkLanding([self.targetPlatform], prevBottom)
+            elif platforms:
+                self._checkLanding(platforms, prevBottom)
+
+            if not self.landed and self.rect.top > SCREEN_HEIGHT:
+                self.kill()
+        else:
+            if self.landedPlatform is not None:
+                self.rect.bottom = self.landedPlatform.rect.y + self.landOffset
+            self.animate()
+
+    def _checkLanding(self, platforms, prevBottom):
+        bestPlatform, bestLandY = _findLandingSurface(self.rect, prevBottom, platforms)
+
+        if bestLandY is not None:
+            self.rect.bottom = bestLandY
+            self.landed = True
+            self.landedPlatform = bestPlatform
+            self.landOffset = self.rect.bottom - bestPlatform.rect.y
+
+    def animate(self):
+        self.animTimer += 1
+        if self.animTimer >= self.animSpeed:
+            self.animTimer = 0
+
+            if self.animIndex >= len(self.currentFrames) - 1:
+                # Played all the way through the blast + smoke — done.
+                self.kill()
+                return
+
+            self.animIndex += 1
+            if self.animIndex >= self.explosionFrameIndex:
+                self.exploded = True
+
+        self.image = self.currentFrames[self.animIndex]
+
+        oldMidBottom = self.rect.midbottom
+        self.rect = self.image.get_rect()
+        self.rect.midbottom = oldMidBottom
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
+
 class Feathers(Enemy):
 
-    def __init__(self, x, y, hp=10, hoverOffset=150, wanderRange=150, scale=0.4):
+    def __init__(self, x, y, bombGroup=None, hp=10, hoverOffset=150, wanderRange=150, scale=0.4,
+                 bombIntervalSeconds=2, bombSpeed=4, bombDamage=1, flashFrames=8, flashAmount=70,
+                 deadScaleFactor=0.6, verticalWanderRange=100):
         super().__init__(x, y, hp)
 
         sheet = pygame.image.load(r"feather_assets/feather_movement.png").convert_alpha()
@@ -466,10 +624,68 @@ class Feathers(Enemy):
         self.flyRFrames = extractFrames(sheet, 5)
         self.flyLFrames = [pygame.transform.flip(f, True, False) for f in self.flyRFrames]
 
+        # feather_hurt.png is a single pose (not a sheet), with the same
+        # opaque-black-background situation as egg bomb.png, so it needs the
+        # same load-as-RGB -> colorkey -> convert_alpha treatment. Scaled by
+        # matching flight-frame height (rather than reusing `scale`, which
+        # was calibrated for feather_movement.png's very different raw size)
+        # so the bird doesn't visibly grow/shrink the instant it gets hurt.
+        # Wrapped in single-element lists so it drops into the exact same
+        # currentFrames/animIndex machinery as flyRFrames/flyLFrames below.
+        hurtRaw = pygame.image.load(r"feather_assets/feather_hurt.png").convert()
+        hurtRaw.set_colorkey((0, 0, 0))
+        hurtRaw = hurtRaw.convert_alpha()
+        hurtScale = self.flyRFrames[0].get_height() / hurtRaw.get_height()
+        hurtImage = pygame.transform.smoothscale_by(hurtRaw, hurtScale)
+        self.hurtRFrames = [hurtImage]
+        self.hurtLFrames = [pygame.transform.flip(hurtImage, True, False)]
+
         self.currentFrames = self.flyRFrames
         self.animIndex = 0
         self.animTimer = 0
         self.animSpeed = 6
+
+        # Hurt state — same shape as Player's/Raccoon's isHurt/hurtTimer:
+        # takeDamage() (overridden below) flips this on, animate() shows the
+        # hurt pose while it's true, and it counts back down to 0 on its own.
+        self.isHurt = False
+        self.hurtTimer = 0
+        self.hurtDuration = 15
+
+        # feather_dead.png, unlike hurt/bomb, already has a real alpha
+        # channel (checked — no opaque black background), so it just needs
+        # convert_alpha(), no colorkey step. Height-matched to the flight
+        # frames like the hurt pose, then shrunk further by deadScaleFactor
+        # so the fallen bird reads as smaller/deflated rather than the same
+        # size as it was alive.
+        deadRaw = pygame.image.load(r"feather_assets/feather_dead.png").convert_alpha()
+        deadScale = (self.flyRFrames[0].get_height() / deadRaw.get_height()) * deadScaleFactor
+        deadImage = pygame.transform.smoothscale_by(deadRaw, deadScale)
+        self.deadRImage = deadImage
+        self.deadLImage = pygame.transform.flip(deadImage, True, False)
+
+        # Death — once hp hits 0, Feathers stops flying/wandering/dropping
+        # bombs and instead falls (same landing-from-above search Bomb
+        # uses, via _findLandingSurface, which also sees Scene3's invisible
+        # floor platform) until it lands on the nearest platform below it,
+        # where it then stays put showing feather_dead.png.
+        self.isDead = False
+        self.deathFallSpeed = 6
+        self.landed = False
+        self.landedPlatform = None
+        self.landOffset = 0
+
+        # Brief brightness flash on hit — same trick as Nest's hit-flash
+        # (BLEND_RGB_ADD, which only touches RGB and leaves the sprite's
+        # transparency alone). Feathers cycles through several different
+        # animated surfaces rather than Nest's fixed per-hit frame list, so
+        # the brightened copies are cached per exact surface (id-keyed)
+        # instead of per frame index — still just a handful of distinct
+        # surfaces total (fly/hurt/dead frames), so the cache stays small.
+        self.flashFrames = flashFrames
+        self.flashAmount = flashAmount
+        self.flashTimer = 0
+        self._brightCache = {}
 
         self.image = self.currentFrames[0]
         self.rect = self.image.get_rect()
@@ -482,7 +698,7 @@ class Feathers(Enemy):
         # it currently is, drifts toward it, then picks a new one, so it
         # reads as "flying left and right randomly" rather than patrolling a
         # fixed line.
-        self.speed = 2
+        self.speed = 4
         self.wanderRange = wanderRange
         self.wanderTargetX = self.rect.centerx
         self.wanderTimer = 0
@@ -494,7 +710,18 @@ class Feathers(Enemy):
         # platform would) means this "just works" through camera scrolling —
         # it's always chasing wherever Prickle visibly is right now.
         self.hoverOffset = hoverOffset
-        self.verticalSpeed = 3
+        self.verticalSpeed = 6
+
+        # Vertical wander — same idea as the horizontal wander above, just
+        # added on top of the hover-above-Prickle baseline instead of
+        # replacing it: a random offset within verticalWanderRange that
+        # changes every so often, so the target y drifts up and down
+        # unpredictably around hoverOffset rather than tracking Prickle in
+        # a perfectly smooth, predictable line.
+        self.verticalWanderRange = verticalWanderRange
+        self.verticalWanderOffset = 0
+        self.verticalWanderTimer = 0
+        self.verticalWanderChangeRate = random.randint(60, 150)
 
         # Keeps the whole sprite on screen on both axes — without this, a
         # large hoverOffset can push Feathers' target above y=0 (off the top
@@ -502,6 +729,16 @@ class Feathers(Enemy):
         # since the raw target is just "player's y minus hoverOffset" with
         # nothing stopping it from going negative.
         self.screenMargin = 20
+
+        # Bomb dropping — a new Bomb every bombIntervalSeconds, added straight
+        # into bombGroup (same constructor-injection pattern as Player's
+        # quillGroup) so the scene can update/draw/collide them without
+        # Feathers needing to know anything about the rest of the scene.
+        self.bombGroup = bombGroup
+        self.bombInterval = FPS * bombIntervalSeconds
+        self.bombTimer = 0
+        self.bombSpeed = bombSpeed
+        self.bombDamage = bombDamage
 
     def pickWanderTargetX(self):
         halfWidth = self.rect.width // 2
@@ -511,9 +748,70 @@ class Feathers(Enemy):
             return self.rect.centerx
         return random.randint(low, high)
 
-    def update(self, player):
+    def takeDamage(self, damage):
+        super().takeDamage(damage)
+        self.flashTimer = self.flashFrames
+        if self.hp > 0:
+            self.isHurt = True
+            self.hurtTimer = self.hurtDuration
+
+    def _brightFrame(self, image):
+        bright = self._brightCache.get(id(image))
+        if bright is None:
+            bright = image.copy()
+            amount = self.flashAmount
+            bright.fill((amount, amount, amount), special_flags=pygame.BLEND_RGB_ADD)
+            self._brightCache[id(image)] = bright
+        return bright
+
+    def draw(self, screen):
+        if self.flashTimer > 0:
+            screen.blit(self._brightFrame(self.image), self.rect)
+        else:
+            screen.blit(self.image, self.rect)
+
+    def update(self, player, platforms=None):
+        if self.flashTimer > 0:
+            self.flashTimer -= 1
+
         if self.hp <= 0:
+            if not self.isDead:
+                self.isDead = True
+                self.image = self.deadRImage if self.facingRight else self.deadLImage
+                oldMidBottom = self.rect.midbottom
+                self.rect = self.image.get_rect()
+                self.rect.midbottom = oldMidBottom
+
+            if not self.landed:
+                prevBottom = self.rect.bottom
+                self.rect.y += self.deathFallSpeed
+
+                if platforms:
+                    bestPlatform, bestLandY = _findLandingSurface(self.rect, prevBottom, platforms)
+                    if bestLandY is not None:
+                        self.rect.bottom = bestLandY
+                        self.landed = True
+                        self.landedPlatform = bestPlatform
+                        self.landOffset = self.rect.bottom - bestPlatform.rect.y
+
+                # Safety net — if nothing catches it (e.g. no platforms
+                # passed in), stop it at the bottom of the screen instead of
+                # falling forever off-screen.
+                if not self.landed and self.rect.top > SCREEN_HEIGHT:
+                    self.rect.bottom = SCREEN_HEIGHT
+                    self.landed = True
+            elif self.landedPlatform is not None:
+                # Stay pinned to the platform's current (scrolled) position,
+                # same trick as Bomb — re-derive from the platform's rect
+                # each frame instead of a fixed screen position.
+                self.rect.bottom = self.landedPlatform.rect.y + self.landOffset
+
             return
+
+        if self.isHurt:
+            self.hurtTimer -= 1
+            if self.hurtTimer <= 0:
+                self.isHurt = False
 
         # Horizontal: drift toward a randomly-changing target x.
         self.wanderTimer += 1
@@ -531,13 +829,22 @@ class Feathers(Enemy):
 
         # Vertical: ease toward hoverOffset px above Prickle's current
         # screen position — never snaps, so it smoothly rises as he climbs.
-        # Clamped so the target itself never asks Feathers to leave the
-        # screen, regardless of how large hoverOffset is or where Prickle
-        # currently is.
+        # A randomly-changing verticalWanderOffset is layered on top of that
+        # baseline (same picked-periodically pattern as the horizontal
+        # wander) so the target drifts up and down unpredictably instead of
+        # tracking Prickle in a perfectly smooth line. Clamped so the target
+        # itself never asks Feathers to leave the screen, regardless of how
+        # large hoverOffset/verticalWanderOffset are or where Prickle is.
+        self.verticalWanderTimer += 1
+        if self.verticalWanderTimer >= self.verticalWanderChangeRate:
+            self.verticalWanderOffset = random.randint(-self.verticalWanderRange, self.verticalWanderRange)
+            self.verticalWanderTimer = 0
+            self.verticalWanderChangeRate = random.randint(60, 150)
+
         halfHeight = self.rect.height // 2
         minCentery = self.screenMargin + halfHeight
         maxCentery = SCREEN_HEIGHT - self.screenMargin - halfHeight
-        targetY = player.rect.centery - self.hoverOffset
+        targetY = player.rect.centery - self.hoverOffset + self.verticalWanderOffset
         targetY = max(minCentery, min(maxCentery, targetY))
 
         dy = targetY - self.rect.centery
@@ -551,10 +858,36 @@ class Feathers(Enemy):
         self.rect.x = max(self.screenMargin, min(SCREEN_WIDTH - self.screenMargin - self.rect.width, self.rect.x))
         self.rect.y = max(self.screenMargin, min(SCREEN_HEIGHT - self.screenMargin - self.rect.height, self.rect.y))
 
+        # Drop a bomb every bombInterval frames (bombIntervalSeconds * FPS).
+        if self.bombGroup is not None:
+            self.bombTimer += 1
+            if self.bombTimer >= self.bombInterval:
+                self.bombTimer = 0
+
+                targetPlatform = getattr(player, "currentPlatform", None)
+                if targetPlatform is not None:
+                    # Drop it above wherever Prickle currently stands, clamped
+                    # to the platform's own width so a bomb aimed near one
+                    # edge still comes down over solid ground on that branch,
+                    # not past its side.
+                    dropX = max(targetPlatform.rect.left,
+                                min(targetPlatform.rect.right - 1, player.rect.centerx))
+                else:
+                    # Prickle's airborne — no specific platform to target,
+                    # so just drop from wherever Feathers currently is.
+                    dropX = self.rect.centerx
+
+                bomb = Bomb(dropX, self.rect.bottom, speed=self.bombSpeed, damage=self.bombDamage,
+                            targetPlatform=targetPlatform)
+                self.bombGroup.add(bomb)
+
         self.animate()
 
     def animate(self):
-        newFrames = self.flyRFrames if self.facingRight else self.flyLFrames
+        if self.isHurt:
+            newFrames = self.hurtRFrames if self.facingRight else self.hurtLFrames
+        else:
+            newFrames = self.flyRFrames if self.facingRight else self.flyLFrames
 
         if newFrames != self.currentFrames:
             self.currentFrames = newFrames

@@ -31,14 +31,14 @@ class Player(pygame.sprite.Sprite):
         self.bgHeight = bgHeight if bgHeight is not None else SCREEN_HEIGHT
 
         self.player_hpFull = pygame.image.load(r"player_assets/player_hpFull.png").convert_alpha()
-        self.player_hpFull = pygame.transform.scale_by(self.player_hpFull, 0.35)
+        self.player_hpFull = pygame.transform.scale_by(self.player_hpFull, 0.245)
         self.player_hpEmpty = pygame.image.load(r"player_assets/player_hpEmpty.png").convert_alpha()
-        self.player_hpEmpty = pygame.transform.scale_by(self.player_hpEmpty, 0.35)
+        self.player_hpEmpty = pygame.transform.scale_by(self.player_hpEmpty, 0.245)
 
         self.ammoFull = pygame.image.load(r"player_assets/ammo_full.png").convert_alpha()
-        self.ammoFull = pygame.transform.scale_by(self.ammoFull, 0.6)
+        self.ammoFull = pygame.transform.scale_by(self.ammoFull, 0.42)
         self.ammoEmpty = pygame.image.load(r"player_assets/ammo_empty.png").convert_alpha()
-        self.ammoEmpty = pygame.transform.scale_by(self.ammoEmpty, 0.6)
+        self.ammoEmpty = pygame.transform.scale_by(self.ammoEmpty, 0.42)
 
         # Extract frames
         def extractFrames(sheet, numFrames):
@@ -145,6 +145,16 @@ class Player(pygame.sprite.Sprite):
         self.hurtTimer = 0
         self.hurtDuration = 15
 
+        # HP-bar hit flash — same BLEND_RGB_ADD trick as Nest's/Feathers'
+        # hit-flash, but reddened rather than brightened, so the heart icons
+        # themselves glow red for a moment whenever Prickle takes damage.
+        # Cached per exact surface (there are only ever two: full/empty).
+        self.hpFlashDuration = 20
+        self.hpFlashAmount = 140
+        self.spriteFlashAmount = 60  # subtler than the heart flash — just a slight red glow on Prickle himself
+        self.hpFlashTimer = 0
+        self._hpFlashCache = {}
+
         # Vertical camera-follow (mirrors how bgWidth bounds horizontal
         # movement). scrollY is how far the world has scrolled to keep
         # Prickle on screen; maxScrollY is how far it CAN scroll before
@@ -198,6 +208,9 @@ class Player(pygame.sprite.Sprite):
             self.hurtTimer -= 1
             if self.hurtTimer <= 0:
                 self.isHurt = False
+
+        if self.hpFlashTimer > 0:
+            self.hpFlashTimer -= 1
 
         self.animate(keys)
 
@@ -392,8 +405,8 @@ class Player(pygame.sprite.Sprite):
             return
 
         ammoX = 30
-        ammoY = 70
-        spacing = 65
+        ammoY = 63
+        spacing = 48
 
         for i in range(self.maxAmmo):
             if i < self.ammo:
@@ -403,10 +416,19 @@ class Player(pygame.sprite.Sprite):
 
             screen.blit(image,(ammoX + i * spacing, ammoY))
 
+    def _redFlashFrame(self, image, amount):
+        key = (id(image), amount)
+        flashed = self._hpFlashCache.get(key)
+        if flashed is None:
+            flashed = image.copy()
+            flashed.fill((amount, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
+            self._hpFlashCache[key] = flashed
+        return flashed
+
     def drawHP(self,screen):
         hpX = 20
         hpY = 10
-        spacing = 65
+        spacing = 58
 
         for i in range(self.maxHP):
             if i < self.hp:
@@ -414,10 +436,14 @@ class Player(pygame.sprite.Sprite):
             else:
                 image = self.player_hpEmpty
 
+            if self.hpFlashTimer > 0:
+                image = self._redFlashFrame(image, self.hpFlashAmount)
+
             screen.blit(image, (hpX + i * spacing, hpY))
-    
+
     def takeDamage(self, damage):
         self.hp -= damage
+        self.hpFlashTimer = self.hpFlashDuration
 
         if self.hp <= 0:
             self.hp = 0
@@ -463,6 +489,13 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
 
         self.rect.midbottom = old_midbottom
+
+        # Same hit-flash that reddens the HP hearts, applied to Prickle's
+        # own sprite too — just a slight tint (spriteFlashAmount is much
+        # lower than hpFlashAmount) so he visibly reacts to damage without
+        # looking like a completely different color.
+        if self.hpFlashTimer > 0:
+            self.image = self._redFlashFrame(self.image, self.spriteFlashAmount)
 
 
 class Quill(pygame.sprite.Sprite):
