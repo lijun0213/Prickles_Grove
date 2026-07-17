@@ -45,6 +45,7 @@ class Scene0:
         # instant Prickle's world-x crosses its trigger point, and freezes
         # the scene (see the top of update()) until dismissed.
         self.dialogue = Dialogue()
+        self.moveTipShown = False
         self.sprintTipShown = False
         self.jumpTipShown = False
         self.pondTipShown = False
@@ -81,6 +82,10 @@ class Scene0:
 
     def checkTutorialCallouts(self):
         x = self.player.rect.centerx
+        if not self.moveTipShown:
+            self.moveTipShown = True
+            self.dialogue.show(["Press A/D to move!"], style="callout")
+            return
         if not self.sprintTipShown and x >= 275:
             self.sprintTipShown = True
             self.dialogue.show(["Hold LSHIFT to sprint!"], style="callout")
