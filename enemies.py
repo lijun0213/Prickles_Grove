@@ -1190,23 +1190,26 @@ class Feathers(Enemy):
 
 
 class EscapeEnemy(pygame.sprite.Sprite):
-    def __init__(self, imagePath, x, y, windowX, windowY, startDelay=0, numIdleFrames=4):
+    def __init__(self, imagePath, x, y, windowX, windowY, startDelay=0, scale=1.0, numIdleFrames=1):
         super().__init__()
 
         sheet = pygame.image.load(imagePath).convert_alpha()
 
+        self.frames = []
         frameWidth = sheet.get_width() // numIdleFrames
         frameHeight = sheet.get_height()
-        self.idleFrames = [
-            sheet.subsurface(pygame.Rect(i * frameWidth, 0, frameWidth, frameHeight))
-            for i in range(numIdleFrames)
-        ]
+        for i in range(numIdleFrames):
+            frame = sheet.subsurface(pygame.Rect(i * frameWidth, 0, frameWidth, frameHeight))
+            # Apply scaling factor dynamically to each frame
+            if scale != 1.0:
+                frame = pygame.transform.scale_by(frame, scale)
+            self.frames.append(frame)
 
         self.animIndex = 0
         self.animTimer = 0
         self.animSpeed = 10
 
-        self.image = self.idleFrames[0]
+        self.image = self.frames[self.animIndex]
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
@@ -1214,7 +1217,7 @@ class EscapeEnemy(pygame.sprite.Sprite):
         # movement
         self.speed = 3
         self.escaping = False
-        self.startDelay = startDelay  # frames to wait before moving, so a group scatters instead of moving as one block
+        self.startDelay = startDelay  # frames to wait before moving
 
         # window target
         self.windowX = windowX
@@ -1235,8 +1238,7 @@ class EscapeEnemy(pygame.sprite.Sprite):
             self.updateShrink()
             return
         
-        # Idle animation always plays — waiting or fleeing — the same way
-        # Prickle keeps animating in idle/walk states.
+        # Idle animation always plays — waiting or fleeing
         self.animate()
 
         if not self.escaping:
@@ -1249,8 +1251,8 @@ class EscapeEnemy(pygame.sprite.Sprite):
         # move right
         self.rect.x += self.speed
 
-        # reach window
-        if self.rect.x >= self.windowX:
+        # reach window (or slightly before it to trigger the window smash smoothly)
+        if self.rect.x >= self.windowX - 10:
             self.beginShrink()
 
     def beginShrink(self):
@@ -1276,6 +1278,6 @@ class EscapeEnemy(pygame.sprite.Sprite):
         self.animTimer += 1
         if self.animTimer >= self.animSpeed:
             self.animTimer = 0
-            self.animIndex = (self.animIndex + 1) % len(self.idleFrames)
+            self.animIndex = (self.animIndex + 1) % len(self.frames)
 
-        self.image = self.idleFrames[self.animIndex]
+        self.image = self.frames[self.animIndex]

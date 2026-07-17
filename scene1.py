@@ -61,7 +61,8 @@ class Scene1:
 
         windowX, windowY = 900, 200
         self.escapeEnemies.add(
-            EscapeEnemy("scene4_assets/wasp_idle.png", 700, 200, windowX, windowY, startDelay=0)
+            EscapeEnemy(r"scene4_assets/queen_idle.png", 700, 200, windowX, windowY, startDelay=0, scale=1.0, numIdleFrames=4),
+            EscapeEnemy(r"feather_assets/feather_movement.png", 580, 130, windowX, windowY, startDelay=5, scale=0.4, numIdleFrames=5)
         )
 
         # State Machine Initialization
