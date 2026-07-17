@@ -57,6 +57,14 @@ class Scene0:
         self.nearExit = False
         self.levelComplete = False
 
+        # Background music — starts the instant the scene loads, stopped by
+        # main.py the moment levelComplete sends Prickle on to Scene1 (same
+        # pygame.mixer.music.stop() pattern main.py already uses for the
+        # other scene-to-scene handoffs).
+        pygame.mixer.music.load(r"scene0_assets/Inorimichite, Chika V2.mp3")
+        pygame.mixer.music.set_volume(0.2)
+        pygame.mixer.music.play(loops=-1)
+
     def update(self):
         keys = pygame.key.get_pressed()
 

@@ -160,6 +160,7 @@ class Game:
             # Level completion transition
             if self.current_scene == -1:
                 if self.scene.levelComplete:
+                    pygame.mixer.music.stop()
                     self.current_scene = 1
                     self.scene = Scene1()
             elif self.current_scene == 1:

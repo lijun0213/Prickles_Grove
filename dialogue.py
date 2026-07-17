@@ -45,7 +45,7 @@ class Dialogue:
     scene, since it has no idea what a Player or an enemy Group is.
     """
 
-    def __init__(self, dismissKeys=(pygame.K_SPACE, pygame.K_RETURN)):
+    def __init__(self, dismissKeys=(pygame.K_f,)):
         self.dismissKeys = dismissKeys
 
         self.active = False
@@ -147,7 +147,7 @@ class Dialogue:
             label = font.render(line, True, WHITE)
             screen.blit(label, (textX, textStartY + i * 26))
 
-        hint = smallFont.render("Press SPACE to continue", True, YELLOW)
+        hint = smallFont.render("Press F to continue", True, YELLOW)
         screen.blit(hint, (textX, boxY + boxHeight - 26))
 
     def _drawCallout(self, screen):
@@ -167,5 +167,5 @@ class Dialogue:
             label = font.render(line, True, WHITE)
             screen.blit(label, (boxX + 12, boxY + 10 + i * 20))
 
-        hint = smallFont.render("SPACE to continue", True, YELLOW)
+        hint = smallFont.render("F to continue", True, YELLOW)
         screen.blit(hint, (boxX + 12, boxY + boxHeight - 18))
