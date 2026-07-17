@@ -9,6 +9,7 @@ from scene0 import Scene0
 from scene1 import Scene1
 from scene3 import Scene3
 from scene4 import Scene4
+from dialogue import Dialogue
 
 class Game:
     def __init__(self):
@@ -45,6 +46,11 @@ class Game:
         self.death_duration = 120
         self.selected_option = 0  # 0 = Retry, 1 = Quit
         self.paused_by_esc = False
+
+        # Scene4 takes a shared Dialogue instance (dialogue_system) rather
+        # than owning its own like every other scene — created once here so
+        # every Scene4() construction below can hand it the same one.
+        self.dialogueSystem = Dialogue()
 
     def run(self):
         while self.running:
@@ -111,7 +117,7 @@ class Game:
         elif self.current_scene == 3:
             self.scene = Scene3() 
         elif self.current_scene == 4:
-            self.scene = Scene4()
+            self.scene = Scene4(self.dialogueSystem)
 
     def exit_to_menu(self):
         self.game_over = False
@@ -165,7 +171,7 @@ class Game:
                 if self.scene.levelComplete:
                     pygame.mixer.music.stop()
                     self.current_scene = 4
-                    self.scene = Scene4()
+                    self.scene = Scene4(self.dialogueSystem)
 
     def draw(self):
         self.screen.fill(BLACK)

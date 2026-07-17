@@ -118,6 +118,13 @@ class Scene3:
             onDismiss=self._showFeatherTaunt,
         )
         self.feathersDeathDialogueShown = False
+        self.spikyBranchDialogueShown = False
+
+        # Battle music — starts the instant the opening dialogue chain ends
+        # (see _endOpeningDialogue), stops the instant Feathers dies (see
+        # the isDead edge-check in update()).
+        pygame.mixer.music.load(r"scene3_assets/Backwater, Kamoking - Battle BGM.mp3")
+        pygame.mixer.music.set_volume(0.2)
 
         # Fade-to-black transition into Scene4, triggered the instant the
         # petal is actually picked up (see updatePetal). levelComplete is
@@ -156,7 +163,14 @@ class Scene3:
         )
 
     def _showPrickleReply(self):
-        self._showDialogue(["Say less!"], speaker="prickle")
+        self._showDialogue(["Say less!"], speaker="prickle", onDismiss=self._endOpeningDialogue)
+
+    def _endOpeningDialogue(self):
+        # Same as _showDialogue's defaultOnDismiss (hands control back to
+        # Prickle), plus kicking off the battle music now that the
+        # back-and-forth is actually over.
+        self.player.controllable = True
+        pygame.mixer.music.play(loops=-1)
 
     def _showFeatherDeathTaunt(self):
         # Fires once, right after Feathers dies — see the isDead edge-check
@@ -181,6 +195,15 @@ class Scene3:
         self._showDialogue(
             ["Climb the trees and destroy the nest"],
             style="callout",
+        )
+
+    def _showSpikyBranchTip(self):
+        # Fires once, the first time a bullet fired from below is blocked by
+        # the spiky branch overhanging the nest — see the hazard check in
+        # handleBulletHits().
+        self._showDialogue(
+            ["Ugh I can't hit the nest... I need to hit it from above"],
+            speaker="prickle",
         )
 
     def update(self):
@@ -230,6 +253,7 @@ class Scene3:
 
         if self.feathers.isDead and not self.feathersDeathDialogueShown:
             self.feathersDeathDialogueShown = True
+            pygame.mixer.music.stop()
             self._showFeatherDeathTaunt()
 
         self.bombs.update(self.platforms)
@@ -349,6 +373,14 @@ class Scene3:
                     continue
                 if platform.collidesRect(bullet.rect):
                     bullet.kill()
+                    # The spiky branch overhangs the nest and blocks any
+                    # bullet fired up at it from below — one-shot hint the
+                    # first time that actually happens, nudging Prickle
+                    # toward climbing above it instead of shooting from the
+                    # ground forever.
+                    if getattr(platform, "hazard", False) and not self.spikyBranchDialogueShown:
+                        self.spikyBranchDialogueShown = True
+                        self._showSpikyBranchTip()
                     break
 
     def handleHazardCollisions(self):

@@ -144,6 +144,10 @@ class Mushroom(pygame.sprite.Sprite):
         self.animIndex = 0
         self.animTimer = 0
 
+        # Bounce sound — same per-instance load pattern as Feathers'
+        # hurt_sound / Nest's hit_sound.
+        self.bounce_sound = pygame.mixer.Sound(r"scene3_assets/bounceshroom (bouncy mushroom).mp3")
+
         mask = pygame.mask.from_surface(self.image)
         width, height = self.image.get_size()
         self.surfaceY = []
@@ -168,6 +172,7 @@ class Mushroom(pygame.sprite.Sprite):
         self.bouncing = True
         self.animIndex = 0
         self.animTimer = 0
+        self.bounce_sound.play()
 
     def update(self):
         if not self.bouncing:
