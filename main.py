@@ -44,6 +44,7 @@ class Game:
         self.death_timer = 0
         self.death_duration = 120
         self.selected_option = 0  # 0 = Retry, 1 = Quit
+        self.paused_by_esc = False
 
     def run(self):
         while self.running:
@@ -62,7 +63,17 @@ class Game:
  
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.running = False
+                    if self.current_scene != 0:  # only in an actual scene, not the main menu
+                        if self.game_over and self.paused_by_esc:
+                            # ESC again while paused → resume
+                            self.game_over = False
+                            self.paused_by_esc = False
+                        elif not self.game_over:
+                            # Open the menu immediately — full alpha, no fade-in wait
+                            self.game_over = True
+                            self.paused_by_esc = True
+                            self.death_timer = self.death_duration
+                            self.selected_option = 0
 
                 if event.key == pygame.K_F1:
                     self.showDebugCoords = not self.showDebugCoords
@@ -76,7 +87,11 @@ class Game:
                     
                     if event.key in (pygame.K_SPACE, pygame.K_RETURN):
                         if self.selected_option == 0:  # Retry
-                            self.restart_level()  # Hard reset scene instance
+                            if self.paused_by_esc:
+                                self.game_over = False
+                                self.paused_by_esc = False
+                            else:
+                                self.restart_level()                        
                         elif self.selected_option == 1:  # Quit to Main Menu
                             self.exit_to_menu()
                     continue  # Skip checking normal gameplay key presses
@@ -100,6 +115,7 @@ class Game:
 
     def exit_to_menu(self):
         self.game_over = False
+        self.paused_by_esc = False
         self.death_timer = 0
         self.current_scene = 0
         self.scene = None
@@ -131,19 +147,20 @@ class Game:
             if self.scene.player.hp <= 0:
                 self.scene.player.takeDamage = True
                 self.game_over = True
+                self.paused_by_esc = False
                 self.death_timer = 0
                 self.selected_option = 0
 
             # Level completion transition
-            if self.current_scene == 1:
-                if self.scene.levelComplete:
-                    pygame.mixer.music.stop()
-                    self.current_scene = 4
-                    self.scene = Scene4()
-            elif self.current_scene == -1:
+            if self.current_scene == -1:
                 if self.scene.levelComplete:
                     self.current_scene = 1
                     self.scene = Scene1()
+            elif self.current_scene == 1:
+                if self.scene.levelComplete:
+                    pygame.mixer.music.stop()
+                    self.current_scene = 3
+                    self.scene = Scene3()
             elif self.current_scene == 3:
                 if self.scene.levelComplete:
                     pygame.mixer.music.stop()
@@ -172,7 +189,10 @@ class Game:
     def draw_game_over_menu(self):
         """Draws a fading dark tint screen layer overlay with interactive options."""
         # Visual fade calculated smoothly across the transition timers
-        alpha = min(180, int((self.death_timer / self.death_duration) * 180))
+        if self.paused_by_esc:
+            alpha = 180
+        else:
+            alpha = min(180, int((self.death_timer / self.death_duration) * 180))
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((10, 10, 10, alpha))
         self.screen.blit(overlay, (0, 0))
@@ -181,14 +201,16 @@ class Game:
             font_title = pygame.font.SysFont("Arial", 48, bold=True)
             font_menu  = pygame.font.SysFont("Arial", 24, bold=True)
 
-            title = font_title.render("GAME OVER", True, RED)
+            title_text = "PAUSED" if self.paused_by_esc else "GAME OVER"
+            title_color = WHITE if self.paused_by_esc else RED
+            title = font_title.render(title_text, True, title_color)
             self.screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, SCREEN_HEIGHT // 2 - 85))
 
-            # Build selection lists layout items
             retry_color = YELLOW if self.selected_option == 0 else WHITE
             quit_color  = YELLOW if self.selected_option == 1 else WHITE
 
-            retry_text = font_menu.render("RETRY", True, retry_color)
+            retry_label = "RESUME" if self.paused_by_esc else "RETRY"
+            retry_text = font_menu.render(retry_label, True, retry_color)
             quit_text  = font_menu.render("QUIT", True, quit_color)
 
             self.screen.blit(retry_text, (SCREEN_WIDTH // 2 - 120, SCREEN_HEIGHT // 2 + 10))
