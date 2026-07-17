@@ -7,11 +7,12 @@ from obstacles import Platform, MovingPlatform
 import effects
 
 class Scene4:
-    def __init__(self):
+    def __init__(self, dialogue_system):
         # 1. Background setup & expanding world limits for a long stage layout
         self.bg = pygame.image.load(r"scene4_assets/scene4_bg.png").convert_alpha()
         bgWidth, bgHeight = self.bg.get_size()
         scaleY = SCREEN_HEIGHT / bgHeight
+        
         # Explicitly make the map much wider than a single standard window frame
         self.worldWidth = max(bgWidth * scaleY, SCREEN_WIDTH * 3)
         self.bg = pygame.transform.scale(self.bg, (int(self.worldWidth), SCREEN_HEIGHT))
@@ -51,7 +52,6 @@ class Scene4:
         self.bossGroup.add(self.boss)
         self.stings = pygame.sprite.Group()
         self.boss.stingGroup = self.stings
-        self.boss.stingGroup = self.stings 
         self.bossEffects = pygame.sprite.Group()
 
         # Wave tracking
@@ -65,6 +65,12 @@ class Scene4:
         self.flowerCollected = False
         self.nearFlower = False
 
+        # Dialogue System Reference
+        self.dialogue = dialogue_system
+        self.speakerNames = {
+            "prickle": "Prickle",
+            "queen": "Queen Beeatrice"
+        }
         self.portraits = {
             "prickle": pygame.transform.scale_by(self.player.idleFrames[0], 1.3),
             "queen" : pygame.transform.scale_by(self.boss.attackRFrames[0], 0.7)
@@ -74,30 +80,26 @@ class Scene4:
         self.state = "INTRO"
         self.levelComplete = False
 
-        self.popupLines = ["The flowers glow strangely here...", "Something's watching me."]
-        self.popupSpeaker = "prickle"
-        self.popupNext = "BOSS_COMMAND"
-        self.showPopup = True
-        self.player.controllable = False
-        self._popupKeyWasDown = False
-        self.popupDismissKeys = (pygame.K_SPACE, pygame.K_RETURN)
+        # Trigger Initial Dialogue State
+        self._showDialogue(
+            ["The flowers glow strangely here...", "Something's watching me."],
+            speaker="prickle",
+            next="BOSS_COMMAND",
+            onDismiss=self._showBossCommand
+        )
 
         # Death handling variables
         self.deathTimer = 0
         self.deathDuration = 120 # ~2 seconds for animation sequence to unfold
 
-        # background music
+        # Background music
         pygame.mixer.music.load(r"scene4_assets/scene4_bgmusic.mp3")
         pygame.mixer.music.set_volume(0.2) 
         pygame.mixer.music.play(loops=-1)
 
-
     def _showDialogue(self, lines, speaker="prickle", style="center", next=None, onDismiss=None):
         """Open the shared dialogue box, resolving a speaker key into this
-        scene's portrait/name. `next` is a convenience for the common case
-        (just set self.state once dismissed); pass a custom `onDismiss`
-        instead for anything fancier (e.g. chaining straight into another
-        dialogue, like the intro -> boss-command -> swarm sequence below)."""
+        scene's portrait/name."""
         def defaultOnDismiss():
             self.player.controllable = True
             if next is not None:
@@ -133,8 +135,7 @@ class Scene4:
             sx = random.randint(1100, 1500)
             sy = random.randint(100, 250)
             wasp = Wasp(sx, sy)
-            if hasattr(wasp, 'speed'):
-                wasp.speed = 1.5
+            wasp.speed = 1.5
             self.wasps.add(wasp)
 
     def update(self):
@@ -145,30 +146,27 @@ class Scene4:
             self.state = "DEATH"
             self.player.isDeath = True
             self.player.controllable = False
-            self.deathTimer = 0
-            # If your Player class has a death sound, trigger it here:
-            # self.player.death_sound.play()
+            self.deathTimer = self.deathDuration
 
         if self.state == "DEATH":
             self.updateDeathSequence()
             return
 
-        if self.showPopup:
-            self.updatePopup(keys)
+        # Let dialogue system update and suppress gameplay if active
+        if self.dialogue.active:
+            self.dialogue.update(keys)
             self.updateCamera()
             if self.boss:
                 self.boss.update(self.player, active=False)
             return
 
         for platform in self.platforms:
-            if hasattr(platform, 'update'):
-                platform.update()
+            platform.update()
 
         # Core operational loops
         self.player.update(keys, platforms=self.platforms)
         self.quills.update()
         self.updateCamera() # Keep camera locked precisely to current position frame-by-frame
-
         self.bossEffects.update()
 
         if self.player.onGround:
@@ -186,19 +184,13 @@ class Scene4:
     def updateDeathSequence(self):
         """Processes death sequence timers and tracks animations independently of controls."""
         self.deathTimer -= 1
-        # Force player object to switch into internal death frame sequence indexes
-        if hasattr(self.player, 'animate_death'):
-            self.player.animate_death()
-        elif hasattr(self.player, 'deathFrames'):
-            # Fallback frame switcher logic manually over local variables
-            self.player.image = self.player.deathFrames[min(
-                len(self.player.deathFrames) - 1,
-                (self.deathDuration - self.deathTimer) // 10
-            )]
+        self.player.image = self.player.deathFrames[min(
+            len(self.player.deathFrames) - 1,
+            (self.deathDuration - self.deathTimer) // 10
+        )]
 
         if self.deathTimer <= 0:
-            # Reload loop or trigger reset game signals contextually here
-            self.__init__()
+            self.__init__(self.dialogue)
 
     def updateCamera(self):
         """Updates internal center coordinates relative to modern long map styles."""
@@ -236,28 +228,24 @@ class Scene4:
             if self.currentWaveIndex < len(self.waveConfigurations):
                 self.spawnWaspWave()
             else:
-                self.popupLines = ["My swarm has fallen...", "Now you face me directly!"]
-                self.popupSpeaker = "queen"
-                self.popupNext = "BOSS_FIGHT"
-                self.showPopup = True
+                self._showDialogue(
+                    ["My swarm has fallen...", "Now you face me directly!"],
+                    speaker="queen",
+                    next="BOSS_FIGHT"
+                )
 
     def updateBossFight(self):
         self.boss.update(self.player, active=True)
         self.boss.updateBuzz(self.player)
-
         self.stings.update()
 
         for sting in list(self.stings):
             if sting.rect.colliderect(self.player.rect):
-                if hasattr(self.player, 'applyParalysis'):
-                    self.player.applyParalysis(PARALYSIS_DURATION)
-                else:
-                    self.player.takeDamage(1)
+                self.player.applyParalysis(PARALYSIS_DURATION)
                 sting.kill()
 
         for quill in list(self.quills):
             if quill.rect.colliderect(self.boss.rect) and not self.boss.teleporting:
-                self.boss.takeDamage(1)
                 self.boss.shakeTimer = 15      
                 self.boss.shakeMagnitude = 6                   
                 wave = effects.HitShockwave(quill.rect.centerx, quill.rect.centery, max_radius=70)
@@ -268,10 +256,11 @@ class Scene4:
 
         if self.boss.hp <= 0 and self.flowerRect is None:
             self.flowerRect = self.flowerImage.get_rect(center=self.boss.rect.center)
-            self.popupLines = ["The Eternal Flower...", "It's free."]
-            self.popupSpeaker = "prickle"
-            self.popupNext = "VICTORY"
-            self.showPopup = True
+            self._showDialogue(
+                ["The Eternal Flower...", "It's free."],
+                speaker="prickle",
+                next="VICTORY"
+            )
 
     def updateVictory(self, keys):
         if self.flowerCollected:
@@ -283,64 +272,28 @@ class Scene4:
 
             if self.nearFlower and keys[pygame.K_r]:
                 self.flowerCollected = True
-                if hasattr(self.player, 'pickupItem_sound'):
-                    self.player.pickupItem_sound.play()
-                self.popupLines = ["You recovered all the treasures!", "Prickle's Grove is safe again."]
-                self.popupSpeaker = "prickle"
-                self.popupNext = None
-                self.showPopup = True
+                self.player.pickupItem_sound.play()
+                
+                self._showDialogue(
+                    ["You recovered all the treasures!", "Prickle's Grove is safe again."],
+                    speaker="prickle",
+                    next=None
+                )
                 self.levelComplete = True
         else:
             self.nearFlower = False
 
-    def updatePopup(self, keys):
-        if hasattr(self.player, 'applyParalysis'):
-            self.player.applyParalysis(1)
-
-        keyDown = any(keys[k] for k in self.popupDismissKeys)
-        justPressed = keyDown and not self._popupKeyWasDown
-        self._popupKeyWasDown = keyDown
-
-        if justPressed:
-            # 1. Capture what the NEXT phase was going to be
-            next_phase = self.popupNext
-
-            # 2. Clear out popup variables so it cannot loop back on itself
-            self.showPopup = False
-            self.player.controllable = True
-            self.popupNext = None
-
-            # 3. Safely handle step-by-step dialogue chain events
-            if next_phase == "BOSS_COMMAND":
-                self.popupLines = ["Intruder! Wasps, tear this hedgehog apart!"]
-                self.popupSpeaker = "queen"
-                self.popupNext = "START_SWARM" # Set the final dialog link
-                self.showPopup = True
-                self.player.controllable = False
-                return
-
-            if next_phase == "START_SWARM":
-                self.state = "SWARM"
-                self.currentWaveIndex = 0
-                self.spawnWaspWave()
-                return
-
-            if next_phase in ["BOSS_FIGHT", "VICTORY"]:
-                self.state = next_phase
-
     def draw(self, screen):
-        # Apply camera offset to every landscape object drawn onto the display context
+        # Background positioning
         screen.blit(self.bg, (-self.cameraX, 0))
-        screen.blit(self.bg, (-self.cameraX, 0))  
 
         for platform in self.platforms:
-            # Shift platforms back by camera coordinate space adjustments
             screen.blit(platform.image, (platform.rect.x - self.cameraX, platform.rect.y))
 
         for wasp in self.wasps:
             screen.blit(wasp.image, (wasp.rect.x - self.cameraX, wasp.rect.y))
 
-        # Render boss with relative scaling vector translations applied safely
+        # Render boss status adjustments
         if self.boss and self.boss.hp > 0:
             drawX = self.boss.rect.x - self.cameraX
             drawY = self.boss.rect.y
@@ -354,7 +307,6 @@ class Scene4:
                 screen.blit(self.boss.image, (drawX, drawY))
 
             if self.state == "BOSS_FIGHT":
-                # Ensure the health bar updates above the scrolled space coordinates
                 oldRectX = self.boss.rect.x
                 self.boss.rect.x -= self.cameraX
                 self.boss.drawHP(screen)
@@ -372,7 +324,7 @@ class Scene4:
                 text = font.render("Press R to pick up", True, YELLOW)
                 screen.blit(text, (self.flowerRect.x - self.cameraX - 20, self.flowerRect.y - 30))
 
-        # Player drawing vector calculation
+        # Player rendering updates
         screen.blit(self.player.image, (self.player.rect.x - self.cameraX, self.player.rect.y))
 
         for quill in self.quills:
@@ -381,52 +333,11 @@ class Scene4:
         for effect in self.bossEffects:
             effect.draw(screen, self.cameraX)
 
-        # Interface Overlays (Drawn natively directly on viewport base vectors)
+        # Interface elements
         self.player.drawAmmo(screen)
         self.player.drawHP(screen)
         effects.update_and_draw_particles(screen, self.cameraX)
 
-        if self.showPopup:
-            self.drawPopup(screen)
-
-    def drawPopup(self, screen):
-        portrait = self.portraits.get(self.popupSpeaker)
-        boxWidth, boxHeight = 580, 140
-        boxX = SCREEN_WIDTH // 2 - boxWidth // 2
-        boxY = SCREEN_HEIGHT - boxHeight - 20
-
-        box = pygame.Surface((boxWidth, boxHeight), pygame.SRCALPHA)
-        box.fill((20, 20, 20, 210))
-        screen.blit(box, (boxX, boxY))
-        pygame.draw.rect(screen, WHITE, (boxX, boxY, boxWidth, boxHeight), width=2, border_radius=8)
-
-        font = pygame.font.SysFont("Arial", 18)
-        smallFont = pygame.font.SysFont("Arial", 14)
-        nameFont = pygame.font.SysFont("Arial", 15, bold=True)
-
-        textX = boxX + 20
-        textStartY = boxY + 20
-
-        if portrait:
-            plateSize = 90
-            plateX, plateY = boxX + 16, boxY + 16
-            plate = pygame.Surface((plateSize, plateSize), pygame.SRCALPHA)
-            plate.fill((10, 10, 10, 230))
-            screen.blit(plate, (plateX, plateY))
-            pygame.draw.rect(screen, YELLOW, (plateX, plateY, plateSize, plateSize), width=2, border_radius=6)
-
-            portraitRect = portrait.get_rect(center=(plateX + plateSize // 2, plateY + plateSize // 2))
-            screen.blit(portrait, portraitRect)
-
-            name = "Prickle" if self.popupSpeaker == "prickle" else "Queen Beeatrice"
-            nameLabel = nameFont.render(name, True, YELLOW)
-            nameRect = nameLabel.get_rect(centerx=plateX + plateSize // 2, top=plateY + plateSize + 4)
-            screen.blit(nameLabel, nameRect)
-            textX = plateX + plateSize + 20
-
-        for i, line in enumerate(self.popupLines):
-            label = font.render(line, True, WHITE)
-            screen.blit(label, (textX, textStartY + i * 26))
-
-        hint = smallFont.render("Press SPACE to continue", True, YELLOW)
-        screen.blit(hint, (textX, boxY + boxHeight - 26))
+        # Let shared global UI draw dialogue layer natively on top of everything
+        if self.dialogue.active:
+            self.dialogue.draw(screen)

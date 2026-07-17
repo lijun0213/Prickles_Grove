@@ -20,7 +20,7 @@ class Game:
         self.clock  = pygame.time.Clock()
 
         try:
-            self.bg = pygame.image.load(r"player_assets/scene0_bg.png").convert_alpha()
+            self.bg = pygame.image.load(r"scene0_assets/scene 0 & 1.png").convert_alpha()
             bgWidth, bgHeight = self.bg.get_size()
             scale = SCREEN_HEIGHT / bgHeight
             self.bg = pygame.transform.scale(self.bg, (int(bgWidth * scale), SCREEN_HEIGHT))

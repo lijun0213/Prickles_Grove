@@ -77,10 +77,7 @@ class Scene1:
         self.showAmmoTutorial = False
         self.showHP = False
 
-        # Dialogue — shared textbox component (see dialogue.py), reused by
-        # every scene instead of each one reimplementing its own popup
-        # system. _showDialogue below wires it up to this scene's state
-        # machine and Player.controllable.
+        # Dialogue Initialization
         self.dialogue = Dialogue()
         self.ammoInfoShown = False
         self._showDialogue(
@@ -125,12 +122,7 @@ class Scene1:
 
     def _showDialogue(self, lines, speaker="prickle", style="center", next=None):
         """Open the shared dialogue box, resolving a speaker key into this
-        scene's portrait/name, and wiring `next` (a state-machine value, or
-        None) up to Dialogue's onDismiss callback. Freezes Prickle's own
-        input for the duration (mirrors the old popup system) — though
-        update() already skips calling player.update() entirely while the
-        dialogue is active, so this is mostly a belt-and-braces match of
-        the previous behavior."""
+        scene's portrait/name, and wiring `next` up to Dialogue's onDismiss callback."""
         def onDismiss():
             self.player.controllable = True
             if next is not None:
@@ -178,7 +170,6 @@ class Scene1:
         self.updateCamera()
 
     def updateIntro(self):
-        # Trigger once the player walks close
         triggerRange = 300
         nearEnemy = any(
             abs(self.player.rect.centerx - enemy.rect.centerx) <= triggerRange
@@ -188,8 +179,6 @@ class Scene1:
             self._showDialogue(["Wait... something's there!"], speaker="prickle", next="ESCAPE")
 
     def updateEscape(self):
-        keys = pygame.key.get_pressed()
-
         if not self.escapeStarted:
             self.escapeStarted = True
             for enemy in self.escapeEnemies:
@@ -201,7 +190,6 @@ class Scene1:
                 self.windowEffectTimer = self.windowEffectDuration
                 self.window_broken.play()
 
-        # Transition once the wasps clear the room
         if len(self.escapeEnemies) == 0:
             self._showDialogue(
                 ["They escaped!", "But someone left behind..."],
@@ -209,7 +197,6 @@ class Scene1:
             )
 
     def updateChase(self, keys):
-        # Raccoon intercepts the player
         if self.player.rect.colliderect(self.raccoon.rect.inflate(80, 50)):
             self.raccoon.activate()
             self._showDialogue(
@@ -218,7 +205,6 @@ class Scene1:
             )
 
     def updateShoot(self):
-        # Quills and enemy collision processing
         for quill in self.quillGroup:
             hits = pygame.sprite.spritecollide(quill, self.enemies, False)
             for enemy in hits:
@@ -226,9 +212,6 @@ class Scene1:
                 effects.create_impact_burst(quill.rect.center)
                 quill.kill()
 
-        # First shot fired — pop a small callout next to the ammo HUD
-        # explaining the 3-shot limit and cooldown. Doesn't change state,
-        # just pauses briefly and resumes SHOOT once dismissed.
         if self.player.hasShot and not self.ammoInfoShown:
             self.ammoInfoShown = True
             self._showDialogue(
@@ -236,7 +219,6 @@ class Scene1:
                 speaker="prickle", style="callout",
             )
 
-        # If raccoon is dead, drop the map reward
         if self.raccoon.isDead and not self.raccoonDefeated:
             if self.raccoonDeathDelay > 0:
                 self.raccoonDeathDelay -= 1
@@ -274,36 +256,17 @@ class Scene1:
             pygame.mixer.music.fadeout(1000)
             self.levelComplete = True
 
-    def updatePopup(self, keys):
-        keyDown = any(keys[k] for k in self.popupDismissKeys)
-        justPressed = keyDown and not self._popupKeyWasDown
-        self._popupKeyWasDown = keyDown
-
-        if justPressed:
-            self.showPopup = False
-            self.player.controllable = True
-            if self.popupNext in ["ESCAPE", "CHASE", "SHOOT", "MAP"]:
-                self.state = self.popupNext
-                self.popupNext = None
-                if self.state == "MAP" and self.mapRect is None:
-                    self.mapRect = self.mapImage.get_rect(center=self.raccoon.rect.center)
-            self.popupStyle = "center"
-    
     def updateCamera(self):
         self.cameraX = self.player.rect.centerx - SCREEN_WIDTH // 2
         self.cameraX = max(0, min(self.cameraX, self.bgWidth - SCREEN_WIDTH))
-
         self.player.cameraX = self.cameraX
 
     def draw(self, screen):
-        # Draw parallax background
         screen.blit(self.bg, (-self.cameraX, 0))
 
-        # Draw platforms relative to camera screen position
         for platform in self.platforms:
             screen.blit(platform.image, (platform.rect.x - self.cameraX, platform.rect.y))
 
-        # Environmental assets mapping
         if self.windowBroken:
             screen.blit(self.windowBrokenImage, (self.windowBrokenPos[0] - self.cameraX, self.windowBrokenPos[1]))
             if self.windowEffectTimer > 0:
@@ -311,36 +274,33 @@ class Scene1:
                 self.windowEffectTimer -= 1
 
         if self.state == "EXIT":
-            rect = self.doorRect.move(-self.cameraX,0)
+            rect = self.doorRect.move(-self.cameraX, 0)
+            effects.drawDoorGlow(screen, rect, self.doorGlowTimer)
 
-            effects.drawDoorGlow(screen,rect,self.doorGlowTimer)
-
-        # Draw Enemy Hurt
         for enemy in self.enemies:
             is_dead = getattr(enemy, 'isDead', False) or getattr(enemy, 'raccoonConfessed', False)
-
             if getattr(enemy, 'flash_timer', 0) > 0 and not is_dead:
                 flash_surf = enemy.image.copy()
                 flash_surf.fill((255, 50, 50, 255), special_flags=pygame.BLEND_RGBA_MULT)
                 screen.blit(flash_surf, (enemy.rect.x - self.cameraX, enemy.rect.y))
             else:
                 screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
+                
         for enemy in self.escapeEnemies:
             screen.blit(enemy.image, (enemy.rect.x - self.cameraX, enemy.rect.y))
 
         if self.mapRect and not self.mapCollected:
             self.drawMap(screen)
             if self.nearMap:
-                font = pygame.font.SysFont("Arial",18)
-                text = font.render("Press R to pick up",True,YELLOW)
-                screen.blit(text,(self.mapRect.x - self.cameraX - 20,self.mapRect.y - 30))
+                font = pygame.font.SysFont("Arial", 18)
+                text = font.render("Press R to pick up", True, YELLOW)
+                screen.blit(text, (self.mapRect.x - self.cameraX - 20, self.mapRect.y - 30))
 
         screen.blit(self.player.image, (self.player.rect.x - self.cameraX, self.player.rect.y))
 
         for quill in self.quillGroup:
             screen.blit(quill.image, (quill.rect.x - self.cameraX, quill.rect.y))
 
-        # Draw standard user interface over context surfaces
         self.player.drawAmmo(screen)
         self.player.drawHP(screen)
         for enemy in self.enemies:
@@ -349,18 +309,16 @@ class Scene1:
         effects.update_and_draw_particles(screen, self.cameraX)
         effects.update_and_draw_surrender(screen, self.cameraX)
 
+        # Renders the Dialogue overlay box
         self.dialogue.draw(screen)
 
     def drawMap(self, screen):
         cx = self.mapRect.centerx - self.cameraX
         cy = self.mapRect.centery
-
         effects.drawPulseGlow(screen, (cx, cy))
-
         screen.blit(self.mapImage, (self.mapRect.x - self.cameraX, self.mapRect.y))
 
     def drawWindowEffect(self, screen):
         cx = self.windowBrokenPos[0] + self.windowBrokenImage.get_width() // 2 - self.cameraX
         cy = self.windowBrokenPos[1] + self.windowBrokenImage.get_height() // 2
-
         effects.drawShatterBurst(screen, (cx, cy), self.windowEffectTimer, self.windowEffectDuration)
