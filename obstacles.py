@@ -202,8 +202,6 @@ class Nest(pygame.sprite.Sprite):
         if bright is None:
             bright = self.frames[frameIndex].copy()
             amount = self.flashAmount
-            # BLEND_RGB_ADD only touches RGB, leaving per-pixel alpha (and so
-            # the shape's transparency) untouched.
             bright.fill((amount, amount, amount), special_flags=pygame.BLEND_RGB_ADD)
             self._brightCache[frameIndex] = bright
         return bright
