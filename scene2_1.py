@@ -1,13 +1,12 @@
 import pygame
-import music
 from settings import *
 from player import Player
-from obstacles import InvisiblePlatform, Boulder, SporeCloud
+from obstacles import InvisiblePlatform, SporeCloud, Mushroom, Platform
 from enemies import Rat
 from effects import ParticleSystem
 
 
-class Scene2:
+class Scene2_1:
 
     def __init__(self):
 
@@ -15,7 +14,7 @@ class Scene2:
         # Background
         # ==========================
 
-        self.bg = pygame.image.load(r"scene2_assets/Mushroom Meadows Background.png").convert()
+        self.bg = pygame.image.load(r"scene2_assets/Mushroom Meadows Background 2 (Extended).png").convert()
 
         scale = SCREEN_HEIGHT / self.bg.get_height()
 
@@ -27,21 +26,12 @@ class Scene2:
             )
         )
 
+
         self.bgWidth = self.bg.get_width()
         self.bgHeight = self.bg.get_height()
 
         self.showCoords = True
         self.debugFont = pygame.font.SysFont("Consolas",16)
-
-
-        # ==========================
-        # Music Loop for both minion levels
-        # ==========================
-
-        music.playMusic(
-            "scene2_assets/C418 - Aria Math (Minecraft Volume Beta).mp3",
-            0.3
-        )
 
 
         # ==========================
@@ -61,13 +51,13 @@ class Scene2:
             self.bgHeight
         )
 
-        self.player.rect.x = 150
-        self.player.rect.bottom = 310
+        self.player.rect.x = 180
+        self.player.rect.bottom = 350
 
         self.player.groundY = self.bgHeight + 300
 
-        self.boulderDamageCooldown = 0
         self.sporeDamageCooldown = 0
+        self.spikeDamageCooldown = 0
 
         self.particles = ParticleSystem()
 
@@ -87,15 +77,13 @@ class Scene2:
         self.platformList = []
 
         platformData = [
-            (100, 320, 290, 20),
-            (480, 325, 280, 20),
-            (720, 360, 240, 20),
-            (950, 340, 250, 20),
-            (950, 430, 180, 20),
-            (620, 490, 320, 20),
-            (90, 470, 310, 20),
-            (400, 430, 220, 20),
-            (1090,475,110,20)
+            (30, 360, 975, 20),
+            (1250, 360, 390, 20),
+            (1640, 200, 440, 20),
+            (2170, 445, 565, 20),
+            (2120, 240, 390, 20),
+            (2500, 280, 235, 20)
+            
         ]
 
         for x, y, w, h in platformData:
@@ -107,29 +95,51 @@ class Scene2:
 
 
         # ==========================
-        # Boulder
-        # ==========================
-        self.boulders = pygame.sprite.Group()
-
-        boulderData = [
-            {"x":600, "y":205}
-        ]
-
-        for data in boulderData:
-            self.boulders.add(Boulder("scene2_assets/Boulder.png", data["x"], data["y"]))
-
-
-        # ==========================
         # Spore Cloud
         # ==========================
         self.spores = pygame.sprite.Group()
 
         sporeData = [
-            (90,350,190,120),
+            {"x": 380, "y": 320, "w": 190, "h": 120, "scale": 0.35},
+            {"x": 680, "y": 320, "w": 190, "h": 120, "scale": 0.35},
+            {"x": 1380, "y": 320, "w": 190, "h": 120, "scale": 0.35},
+            {"x": 1810, "y": 160, "w": 190, "h": 120, "scale": 0.35},
+            {"x": 2580, "y": 335, "w": 190, "h": 120, "scale": 0.8}
         ]
 
-        for x,y,w,h in sporeData:
-            self.spores.add(SporeCloud("scene2_assets/Spores.png",x,y,w,h))
+        for data in sporeData:
+            self.spores.add(SporeCloud("scene2_assets/Spores.png",
+                data["x"],
+                data["y"],
+                int(data["w"] * data["scale"]),
+                int(data["h"] * data["scale"])
+                )
+            )
+
+        # ==========================
+        # Spike Traps
+        # ==========================
+
+        self.spikes = []
+
+        spikeData = [
+            {
+                "x": 980,
+                "y": 380,
+                "scale": 1.4
+            }
+        ]
+
+        for data in spikeData:
+            spike = Platform(
+                "scene2_assets/Spikefall Trap.png",
+                data["x"],
+                data["y"],
+                scale=data["scale"],
+                hazard=True
+            )
+
+            self.spikes.append(spike)
 
 
         # ==========================
@@ -139,9 +149,11 @@ class Scene2:
         self.rats = pygame.sprite.Group()
 
         ratData = [
-            {"platform":3, "offset":0, "direction":-1, "speed":2, "hp":3},
-            {"platform":5, "offset":40, "direction":1, "speed":2, "hp":4},
-            {"platform":7, "offset":-20, "direction":-1, "speed":2, "hp":3}
+            {"platform":0, "offset":200, "direction":-1, "speed":2, "hp":3},
+            {"platform":0, "offset":450, "direction":-1, "speed":3, "hp":4},
+            {"platform":4, "offset":-100, "direction":1, "speed":2, "hp":2},
+            {"platform":4, "offset":150, "direction":-1, "speed":2, "hp":2},
+            {"platform":3, "offset":200, "direction":-1, "speed":3, "hp":4}
         ]
 
         for data in ratData:
@@ -150,6 +162,43 @@ class Scene2:
             rat = Rat("scene2_assets/rat idle.png", platform, data["offset"], data["direction"], data["speed"], data["hp"], self.particles)
 
             self.rats.add(rat)
+
+
+        # ==========================
+        # Bounce Mushroom
+        # ==========================
+
+        self.mushrooms = pygame.sprite.Group()
+
+        mushroomData = [
+            {
+                "x":1580,
+                "y":260,
+                "bounceForce":22,
+                "angle":0,
+                "scale":0.35
+            },
+            {
+                "x":2170,
+                "y":345,
+                "bounceForce":22,
+                "angle":0,
+                "scale":0.35
+            },
+        ]
+
+        for data in mushroomData:
+
+            mushroom = Mushroom(
+                "scene3_assets/bouncy mushroom.png",
+                data["x"],
+                data["y"],
+                data["bounceForce"],
+                data["angle"],
+                data["scale"]
+            )
+
+            self.mushrooms.add(mushroom)
 
 
         # ==========================
@@ -176,6 +225,8 @@ class Scene2:
             platforms=self.platforms
         )
 
+
+
         # ==========================
         # Fall Death Check
         # ==========================
@@ -184,26 +235,6 @@ class Scene2:
 
             self.player.hp = 0
 
-        # ==========================
-        # Boulder Damage
-        # ==========================
-
-        if self.boulderDamageCooldown > 0:
-            self.boulderDamageCooldown -= 1
-
-
-        for boulder in self.boulders:
-
-            boulder.checkEdge()
-
-            if self.player.rect.colliderect(boulder.rect):
-
-                if self.boulderDamageCooldown == 0:
-
-                    self.player.takeDamage(1)
-                    self.boulderDamageCooldown = 60
-            
-        self.boulders.update()
 
         # ==========================
         # Spore Cloud Damage
@@ -226,6 +257,50 @@ class Scene2:
 
         for spore in self.spores:
             spore.emit(self.particles)
+
+
+        # ==========================
+        # Spike Damage
+        # ==========================
+
+        if self.spikeDamageCooldown > 0:
+            self.spikeDamageCooldown -= 1
+
+
+        for spike in self.spikes:
+
+            if spike.rect.colliderect(self.player.rect):
+
+                if self.spikeDamageCooldown == 0:
+
+                    self.player.takeDamage(3)
+                    self.spikeDamageCooldown = 60
+
+
+        # ==========================
+        # Bounce Mushroom Collision
+        # ==========================
+
+        # Bounce Mushroom Animation
+        self.mushrooms.update()
+
+        for mushroom in self.mushrooms:
+
+            mushroomTop = mushroom.topAt(
+                self.player.rect.centerx
+            )
+
+            if mushroomTop is not None:
+
+                if (
+                    self.player.rect.bottom >= mushroomTop
+                    and self.player.rect.bottom <= mushroomTop + 20
+                    and self.player.velocityY > 0
+                ):
+
+                    mushroom.trigger()
+
+                    self.player.velocityY = -mushroom.bounceForce
 
 
         # Rat Minions
@@ -300,17 +375,6 @@ class Scene2:
             (-self.cameraX,0)
         )
 
-        # Boulder
-        for boulder in self.boulders:
-
-            boulderRect = boulder.rect.copy()
-            boulderRect.x -= self.cameraX
-
-            screen.blit(
-                boulder.image,
-                boulderRect
-            )
-
         # Spore Cloud
         for spore in self.spores:
 
@@ -319,13 +383,40 @@ class Scene2:
 
             screen.blit(
                 spore.image,
-                sporeRect
+                (
+                    spore.rect.x - self.cameraX,
+                    spore.rect.y
+                )
             )
 
         self.particles.draw(
             screen,
             self.cameraX
         )
+
+        # Spike traps
+        for spike in self.spikes:
+            spikeRect = spike.rect.copy()
+            spikeRect.x -= self.cameraX
+
+            screen.blit(
+                spike.image,
+                spikeRect
+            )
+
+        # Bounce Mushrooms
+        for mushroom in self.mushrooms:
+
+            mushroomRect = mushroom.image.get_rect(
+                midbottom=mushroom.rect.midbottom
+            )
+
+            mushroomRect.x -= self.cameraX
+
+            screen.blit(
+                mushroom.image,
+                mushroomRect
+            )
 
         # Rat Minions
         for rat in self.rats:
@@ -347,7 +438,9 @@ class Scene2:
             playerRect
         )
         
+
         # Bullets
+
         for bullet in self.bullets:
 
             bulletRect = bullet.rect.copy()
@@ -358,6 +451,8 @@ class Scene2:
                 bulletRect
             )
 
+
         # HUD
+
         self.player.drawHP(screen)
         self.player.drawAmmo(screen)

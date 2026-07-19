@@ -1,6 +1,8 @@
 import math
 import pygame
-
+import random
+from settings import *
+from effects import Particle
 
 class Platform(pygame.sprite.Sprite):
     """A branch (or similar) Prickle can jump onto to climb higher.
@@ -316,3 +318,160 @@ class MovingPlatform(Platform):
         # Calculate exact change in position this frame
         self.movementDeltaX = self.rect.x - oldX
         self.movementDeltaY = self.rect.y - oldY
+
+
+class InvisiblePlatform(pygame.sprite.Sprite):
+
+    def __init__(self, x, y, width, height):
+        super().__init__()
+
+        self.rect = pygame.Rect(
+            x,
+            y,
+            width,
+            height
+        )
+
+        self.visible = False
+
+
+    def topAt(self, worldX):
+
+        if self.rect.left <= worldX <= self.rect.right:
+            return self.rect.top
+
+        return None
+
+
+    def draw(self, screen):
+        pass
+
+
+    def update(self):
+        pass
+
+
+class Boulder(pygame.sprite.Sprite):
+
+    def __init__(self, imagePath, x, y, speed=2):
+        super().__init__()
+
+        self.image = pygame.image.load(imagePath).convert_alpha()
+        self.rect = self.image.get_rect(topleft=(x,y))
+
+        self.speed = speed
+        self.direction = -1
+
+        # Gravity
+        self.velocityY = 0
+        self.gravity = 0.8
+
+        # State
+        self.active = True
+        self.falling = False
+
+
+    def trigger(self):
+        self.active = True
+
+
+    def checkEdge(self):
+
+        # when reaching the edge
+        if self.rect.x <= 400:
+
+            self.falling = True
+
+
+    def update(self):
+
+        if not self.active:
+            return
+
+
+        # Horizontal movement
+        if not self.falling:
+
+            self.rect.x += self.speed * self.direction
+
+
+        # Falling after edge
+        else:
+
+            self.velocityY += self.gravity
+            self.rect.y += self.velocityY
+
+
+            # Remove after falling off screen
+            if self.rect.top > SCREEN_HEIGHT + 200:
+                self.kill()
+
+
+    def draw(self, screen):
+
+        screen.blit(
+            self.image,
+            self.rect
+        )
+
+class SporeCloud(pygame.sprite.Sprite):
+
+    def __init__(self, imagePath, x, y, width, height):
+        super().__init__()
+
+        self.image = pygame.image.load(imagePath).convert_alpha()
+
+        self.image = pygame.transform.scale(
+            self.image,
+            (
+                width,
+                height
+            )
+        )
+
+        self.rect = self.image.get_rect(
+            topleft=(x,y)
+        )
+        
+        self.rect = pygame.Rect(
+            x,
+            y,
+            width,
+            height
+        )
+
+        self.damageCooldown = 0
+        self.emitTimer = 0
+
+
+    def update(self):
+
+        if self.damageCooldown > 0:
+            self.damageCooldown -= 1
+
+    def emit(self, particleSystem):
+        self.emitTimer += 1
+
+        if self.emitTimer >= 10:
+            self.emitTimer = 0
+
+            particle = Particle(
+
+                self.rect.centerx + random.randint(-50,50),
+
+                self.rect.centery + random.randint(-20,20),
+
+                (180,255,120),
+
+                random.randint(2,4),
+
+                (
+                    random.uniform(-0.5,0.5),
+                    random.uniform(-2,-0.5)
+                ),
+
+                60
+
+            )
+
+            particleSystem.add(particle)

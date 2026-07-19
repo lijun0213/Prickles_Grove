@@ -7,6 +7,9 @@ import sys
 from settings import *
 from scene0 import Scene0
 from scene1 import Scene1
+from scene2 import Scene2
+from scene2_1 import Scene2_1
+from scene2Boss import Scene2Boss
 from scene3 import Scene3
 from scene4 import Scene4
 from dialogue import Dialogue
@@ -114,6 +117,12 @@ class Game:
         # Instantiate a fresh copy of the scene based on active current_scene ID
         if self.current_scene == 1:
             self.scene = Scene1()
+        elif self.current_scene == 2:
+            self.scene = Scene2()
+        elif self.current_scene == 21:
+            self.scene = Scene2_1()
+        elif self.current_scene == 22:
+            self.scene = Scene2Boss()
         elif self.current_scene == 3:
             self.scene = Scene3() 
         elif self.current_scene == 4:
@@ -151,7 +160,7 @@ class Game:
             # --- Player HP Death Check ---
             # Direct check using self.scene.player.hp
             if self.scene.player.hp <= 0:
-                self.scene.player.takeDamage = True
+                self.scene.player.isDeath = True
                 self.game_over = True
                 self.paused_by_esc = False
                 self.death_timer = 0
@@ -164,6 +173,20 @@ class Game:
                     self.current_scene = 1
                     self.scene = Scene1()
             elif self.current_scene == 1:
+                if self.scene.levelComplete:
+                    pygame.mixer.music.stop()
+                    self.current_scene = 2
+                    self.scene = Scene2()
+            elif self.current_scene == 2:
+                if self.scene.levelComplete:
+                    self.current_scene = 21
+                    self.scene = Scene2_1()
+            elif self.current_scene == 21:
+                if self.scene.levelComplete:
+                    pygame.mixer.music.stop()
+                    self.current_scene = 22
+                    self.scene = Scene2Boss()
+            elif self.current_scene == 22:
                 if self.scene.levelComplete:
                     pygame.mixer.music.stop()
                     self.current_scene = 3

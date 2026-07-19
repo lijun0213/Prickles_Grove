@@ -334,7 +334,7 @@ class Player(pygame.sprite.Sprite):
         self.isRunning = keys[pygame.K_LSHIFT]
         self.speed = 8 if self.isRunning else 5
 
-        if not self.paralyzed:
+        if not self.paralyzed and not self.isHurt:
             if keys[pygame.K_a]:
                 self.rect.x -= self.speed
                 self.velocityX = 0  # manual input always overrides bounce drift
@@ -378,6 +378,9 @@ class Player(pygame.sprite.Sprite):
                 self.onGround = False
 
     def handleAttack(self):
+        if self.isHurt or self.isDeath:
+            return
+        
         mouse_buttons = pygame.mouse.get_pressed()
         mousePressed = mouse_buttons[0] # left click
 
@@ -467,13 +470,22 @@ class Player(pygame.sprite.Sprite):
             screen.blit(image, (hpX + i * spacing, hpY))
 
     def takeDamage(self, damage):
+        # Don't take damage while already dead
+        if self.isDeath:
+            return
+
         self.hp -= damage
         self.hpFlashTimer = self.hpFlashDuration
+
+        if self.hp > 0:
+            self.isHurt = True
+            self.hurtTimer = self.hurtDuration
 
         if self.hp <= 0:
             self.hp = 0
             self.isDeath = True
             self.controllable = False
+            self.isHurt = False
             print("Player Dead")
 
     def applyParalysis(self, duration):
@@ -512,7 +524,12 @@ class Player(pygame.sprite.Sprite):
 
         if self.animTimer >= self.animSpeed:
             self.animTimer = 0
-            self.animIndex = (self.animIndex + 1) % len(self.currentFrames)
+
+            if self.isDeath:
+                if self.animIndex < len(self.currentFrames) - 1:
+                    self.animIndex += 1
+            else:
+                self.animIndex = (self.animIndex + 1) % len(self.currentFrames)
 
         self.image = self.currentFrames[self.animIndex]
 

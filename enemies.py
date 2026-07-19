@@ -1281,3 +1281,547 @@ class EscapeEnemy(pygame.sprite.Sprite):
             self.animIndex = (self.animIndex + 1) % len(self.frames)
 
         self.image = self.frames[self.animIndex]
+
+class Rat(pygame.sprite.Sprite):
+
+    def __init__(self, imagePath, platform, offset = 0, direction = -1, speed = 3, hp = 3, particleSystem=None):
+
+        super().__init__()
+
+        self.animations = {
+
+            "idle": self.loadFrames("scene2_assets/rat idle.png",5),
+
+            "walk": self.loadFrames("scene2_assets/rat walk.png",5),
+
+            "attack": self.loadFrames("scene2_assets/rat attack.png",5),
+
+            "hurt": self.loadFrames("scene2_assets/rat hurt.png",3),
+
+            "death": self.loadFrames("scene2_assets/rat death.png",2)
+        }
+
+        # ==========================
+        # Sprite Scaling
+        # ==========================
+
+        self.scale = 0.75
+
+        for state in self.animations:
+            scaledFrames = []
+
+            for frame in self.animations[state]:
+                frame = pygame.transform.scale_by(
+                    frame,
+                    self.scale
+                )
+
+                scaledFrames.append(frame)
+
+            self.animations[state] = scaledFrames
+
+
+        self.state = "idle"
+
+        self.frameIndex = 0
+        self.animationSpeed = 0.15
+        self.yOffset = 20
+
+        self.image = self.animations["idle"][0]
+
+        self.rect = self.image.get_rect()
+
+        self.rect.midbottom = (platform.rect.centerx + offset, platform.rect.top + self.yOffset)
+
+
+        # Patrol
+        self.platform = platform
+
+        self.direction = direction
+        self.speed = speed
+        self.xVelocity = 0
+
+
+        # Combat
+        self.hp = hp
+
+        self.aggroRange = 250
+        self.attackRange = 60
+        self.attackCooldown = 0
+        self.attackDamage = 1
+
+        self.facingLeft = True
+
+        self.hurtTimer = 0
+
+        self.isDead = False
+        self.deathTimer = 60
+
+        self.particleSystem = particleSystem
+
+
+    def update(self, player):
+
+        if self.attackCooldown > 0:
+            self.attackCooldown -= 1
+
+        if self.isDead:
+            self.deathTimer -= 1
+
+            self.changeState("death")
+            self.animate()
+
+            if self.deathTimer <= 0:
+                self.kill()
+
+            return
+
+        if self.hurtTimer > 0:
+            self.hurtTimer -= 1
+
+        else:
+
+            distanceX = abs(player.rect.centerx -self.rect.centerx)
+            distanceY = abs(player.rect.centery -self.rect.centery)
+
+            if (distanceX <= self.aggroRange and distanceY <= 40):
+                self.chase(player)
+
+            else:
+                self.patrol()
+
+        self.animate()
+
+
+    def patrol(self):
+
+        self.changeState("walk")
+
+        self.xVelocity = self.direction * self.speed
+        self.rect.x += int(self.xVelocity)
+
+        if self.rect.left <= self.platform.rect.left:
+            self.rect.left = self.platform.rect.left
+            self.direction = 1
+
+        elif self.rect.right >= self.platform.rect.right:
+            self.rect.right = self.platform.rect.right
+            self.direction = -1
+
+        self.facingLeft = self.direction < 0
+
+
+    def chase(self, player):
+
+        dx = (player.rect.centerx - self.rect.centerx)
+        dy = abs(player.rect.centery - self.rect.centery)
+
+        if (abs(dx) <= self.attackRange and dy <= 30):
+
+            if dx < 0:
+                self.direction = -1
+            else:
+                self.direction = 1
+
+            self.facingLeft = self.direction < 0
+            self.changeState("attack")
+
+            if self.attackCooldown == 0:
+                player.takeDamage(1)
+                self.attackCooldown = 60
+                player.rect.x += self.direction * 50
+
+            return
+
+        self.changeState("walk")
+
+        if dx < 0:
+            self.direction = -1
+
+        else:
+            self.direction = 1
+
+        self.xVelocity = self.direction * self.speed
+        self.rect.x += int(self.xVelocity)
+
+        # IMPORTANT
+        # Stop leaving patrol platform
+
+        if self.rect.left < self.platform.rect.left:
+            self.rect.left = self.platform.rect.left
+
+        if self.rect.right > self.platform.rect.right:
+            self.rect.right = self.platform.rect.right
+
+        self.facingLeft = self.direction < 0
+
+
+    def takeDamage(self, amount):
+
+        if self.isDead:
+            return
+
+        self.hp -= amount
+
+        if self.hp <= 0:
+            self.hp = 0
+            self.isDead = True
+
+            self.changeState("death")
+            self.deathTimer = 30
+
+            if self.particleSystem:
+
+                from effects import createRatDeathEffect
+
+                createRatDeathEffect(
+                    self.particleSystem,
+                    self.rect.center
+                )
+
+        else:
+            self.changeState("hurt")
+            self.hurtTimer = 15
+
+
+    def loadFrames(self, imagePath, frameCount):
+
+        sheet = pygame.image.load(imagePath).convert_alpha()
+
+        frames=[]
+
+        width = sheet.get_width() // frameCount
+        height = sheet.get_height()
+
+        for i in range(frameCount):
+            frame = sheet.subsurface(pygame.Rect(i * width, 0, width, height))
+
+            frames.append(frame)
+
+        return frames
+
+
+    def animate(self):
+        frames = self.animations[self.state]
+
+        self.frameIndex += self.animationSpeed
+
+        if self.frameIndex >= len(frames):
+            self.frameIndex = 0
+
+        bottom = self.rect.bottom
+        left = self.rect.left
+
+        self.image = frames[int(self.frameIndex)]
+
+        self.rect = self.image.get_rect()
+
+        self.rect.left = left
+        self.rect.bottom = bottom
+
+        if self.facingLeft:self.image = pygame.transform.flip(self.image, True, False)
+
+
+    def changeState(self,state):
+
+        if self.state != state:
+            self.state = state
+            self.frameIndex = 0
+
+
+class BossRat(Enemy):
+
+    def __init__(self, x, y, hp = 10):
+        super().__init__(x, y, hp)
+
+        # ==========================
+        # Load Sprite Sheets
+        # ==========================
+
+        ratIdle = pygame.image.load(
+            r"scene2_assets/Rat Boss Idle.png"
+        ).convert_alpha()
+
+        ratWalk = pygame.image.load(
+            r"scene2_assets/Rat Boss Walk.png"
+        ).convert_alpha()
+
+        ratAttack = pygame.image.load(
+            r"scene2_assets/Rat Boss Pounce.png"
+        ).convert_alpha()
+
+        ratHurt = pygame.image.load(
+            r"scene2_assets/Rat Boss Hurt.png"
+        ).convert_alpha()
+
+        ratDeath = pygame.image.load(
+            r"scene2_assets/Rat Boss Death.png"
+        ).convert_alpha()
+
+
+        # Scale
+        scale = 1.2
+
+        ratIdle = pygame.transform.scale_by(ratIdle, scale)
+        ratWalk = pygame.transform.scale_by(ratWalk, scale)
+        ratAttack = pygame.transform.scale_by(ratAttack, scale)
+        ratHurt = pygame.transform.scale_by(ratHurt, scale)
+        ratDeath = pygame.transform.scale_by(ratDeath, scale)
+
+
+
+        # ==========================
+        # Frame Extraction
+        # ==========================
+
+        def extractFrames(sheet, count):
+
+            frames = []
+
+            width = sheet.get_width() // count
+            height = sheet.get_height()
+
+            for i in range(count):
+
+                frame = sheet.subsurface(
+                    pygame.Rect(
+                        i * width,
+                        0,
+                        width,
+                        height
+                    )
+                )
+
+                frames.append(frame)
+
+            return frames
+
+        idleFrames = extractFrames(ratIdle, 7)
+        walkFrames = extractFrames(ratWalk, 7)
+        attackFrames = extractFrames(ratAttack, 4)
+        hurtFrames = extractFrames(ratHurt, 7)
+        deathFrames = extractFrames(ratDeath, 6)
+
+        self.animations = {
+
+            "idle": idleFrames,
+            "walk": walkFrames,
+            "attack": attackFrames,
+            "hurt": hurtFrames,
+            "death": deathFrames
+
+        }
+
+
+        # ==========================
+        # Animation Variables
+        # ==========================
+
+        self.currentFrames = self.animations["idle"]
+
+        self.animIndex = 0
+        self.animTimer = 0
+        self.animSpeed = 8
+
+        self.image = self.currentFrames[0]
+
+        self.rect = self.image.get_rect()
+
+        self.rect.x = x
+        self.rect.bottom = y + 15
+
+
+        # ==========================
+        # Boss Stats
+        # ==========================
+        self.isDead = False
+
+        self.isHurt = False
+        self.hurtTimer = 0
+        self.hurtDuration = 45
+
+
+        # ==========================
+        # Boss AI
+        # ==========================
+
+        self.speed = 2
+
+        self.attackRange = 100
+        self.detectRange = 900
+
+        self.attackCooldown = 0
+        self.attackCooldownMax = 120
+        self.attackDamage = 1
+
+        self.isAttacking = False
+        self.attackTimer = 0
+
+        self.state = "idle"
+
+
+    def takeDamage(self, damage):
+
+        if self.isDead:
+            return
+
+        self.hp -= damage
+
+        self.isHurt = True
+        self.hurtTimer = self.hurtDuration
+
+        self.state = "hurt"
+
+        if self.hp <= 0:
+
+            self.hp = 0
+            self.isDead = True
+
+    def animate(self):
+
+        if self.isDead:
+            newFrames = self.animations["death"]
+
+        elif self.isHurt:
+            newFrames = self.animations["hurt"]
+
+        elif self.state == "attack":
+            newFrames = self.animations["attack"]
+
+        elif self.state == "walk":
+            newFrames = self.animations["walk"]
+
+        else:
+            newFrames = self.animations["idle"]
+
+
+        if newFrames != self.currentFrames:
+            self.currentFrames = newFrames
+            self.animIndex = 0
+            self.animTimer = 0
+
+        self.animTimer += 1
+
+        if self.animTimer >= self.animSpeed:
+
+            self.animTimer = 0
+
+            self.animIndex += 1
+
+            if self.animIndex >= len(self.currentFrames):
+
+                if self.isDead:
+
+                    self.animIndex = len(self.currentFrames)-1
+
+                else:
+
+                    self.animIndex = 0
+
+        self.flipImage()
+
+    def update(self, player):
+        if self.isDead:
+            self.animate()
+            return
+
+        # Attack cooldown
+        if self.attackCooldown > 0:
+            self.attackCooldown -= 1
+
+        # Hurt cooldown
+        if self.hurtTimer > 0:
+            self.hurtTimer -= 1
+
+        else:
+            self.isHurt = False
+
+        dx = player.rect.centerx - self.rect.centerx
+
+        if dx > 0:
+
+            self.facingRight = True
+
+        else:
+
+            self.facingRight = False
+
+        dy = player.rect.centery - self.rect.centery
+
+        distance = (dx*dx + dy*dy)**0.5
+
+        if distance <= self.detectRange:
+
+            if distance <= self.attackRange:
+
+                self.attack(player)
+
+            elif not self.isAttacking:
+
+                self.chase(player, dx)
+
+        else:
+
+            self.state = "idle"
+
+
+        if self.isAttacking:
+
+            self.attackTimer -= 1
+
+            if self.attackTimer <= 0:
+
+                self.isAttacking = False
+                self.state = "idle"
+
+        self.animate()
+
+    def chase(self, player, dx):
+
+        self.state = "walk"
+
+        if dx > 0:
+            self.rect.x += self.speed
+            self.facingRight = True
+
+        else:
+            self.rect.x -= self.speed
+            self.facingRight = False
+
+    def attack(self, player):
+
+        if self.attackCooldown == 0 and not self.isAttacking:
+
+            self.state = "attack"
+            self.isAttacking = True
+
+            self.attackTimer = (
+                len(self.animations["attack"])
+                *
+                self.animSpeed
+            )
+
+            player.takeDamage(
+                self.attackDamage
+            )
+
+            if player.rect.centerx < self.rect.centerx:
+                player.rect.x -= 40
+
+            else:
+                player.rect.x += 40
+
+            self.attackCooldown = self.attackCooldownMax
+            self.attackCooldown = self.attackCooldownMax
+
+    def flipImage(self):
+
+        if self.facingRight:
+            self.image = pygame.transform.flip(
+                self.currentFrames[self.animIndex],
+                True,
+                False
+            )
+            
+        else:
+            self.image = self.currentFrames[self.animIndex]

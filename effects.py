@@ -162,3 +162,125 @@ class HitShockwave(pygame.sprite.Sprite):
     def draw(self, screen, cameraX):
         # Keeps the effect pinned to the game world space relative to camera scroll
         screen.blit(self.image, (self.rect.x - cameraX, self.rect.y))
+
+
+class Particle:
+
+    def __init__(self, x, y, color, size, velocity, lifetime):
+
+        self.x = float(x)
+        self.y = float(y)
+
+        self.velocityX = velocity[0]
+        self.velocityY = velocity[1]
+
+        self.color = color
+
+        self.size = size
+
+        self.life = lifetime
+        self.maxLife = lifetime
+
+
+    def update(self):
+
+        self.x += self.velocityX
+        self.y += self.velocityY
+
+        # gravity (optional)
+        self.velocityY += 0.03
+
+        self.life -= 1
+
+
+    def draw(self, screen, cameraX):
+
+        if self.life <= 0:
+            return
+
+
+        alpha = int(
+            255 * (self.life / self.maxLife)
+        )
+
+
+        particleSurface = pygame.Surface(
+            (self.size*2, self.size*2),
+            pygame.SRCALPHA
+        )
+
+
+        pygame.draw.circle(
+            particleSurface,
+            (
+                self.color[0],
+                self.color[1],
+                self.color[2],
+                alpha
+            ),
+            (
+                self.size,
+                self.size
+            ),
+            self.size
+        )
+
+
+        screen.blit(
+            particleSurface,
+            (
+                self.x - cameraX - self.size,
+                self.y - self.size
+            )
+        )
+
+
+class ParticleSystem:
+
+    def __init__(self):
+        self.particles = []
+
+
+    def add(self, particle):
+        self.particles.append(particle)
+
+
+    def update(self):
+
+        for particle in self.particles[:]:
+
+            particle.update()
+
+            if particle.life <= 0:
+                self.particles.remove(particle)
+
+
+    def draw(self, screen, cameraX):
+
+        for particle in self.particles:
+            particle.draw(screen, cameraX)
+
+
+def createRatDeathEffect(particleSystem, pos):
+
+    for i in range(20):
+
+        particle = Particle(
+
+            pos[0] + random.randint(-10,10),
+            pos[1] + random.randint(-10,10),
+
+            (120,80,50),   # brown dust color
+
+            random.randint(3,6),
+
+            (
+                random.uniform(-3,3),
+                random.uniform(-5,-1)
+            ),
+
+            random.randint(30,50)
+
+        )
+
+        particleSystem.add(particle)
