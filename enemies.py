@@ -740,15 +740,6 @@ def _findLandingSurface(rect, prevBottom, platforms):
 
 
 class Bomb(pygame.sprite.Sprite):
-    """An egg bomb Feathers drops — falls straight down, animating through
-    its frames, and damages Prickle on contact. egg bomb.png is a 10-frame
-    sheet (3000x300, so 300x300px square frames) with an opaque black
-    background (no real alpha), so each frame gets colorkeyed to punch out
-    the black before it's usable as a sprite."""
-
-    # Loaded once and shared across every Bomb instance (rather than
-    # re-decoding the file from disk on every single drop — Feathers can
-    # spawn a new one every ~1-2 seconds).
     _explodeSound = None
 
     def __init__(self, x, y, speed=4, damage=1, scale=0.3, animSpeed=8, explosionFrameIndex=5, targetPlatform=None):
@@ -763,10 +754,7 @@ class Bomb(pygame.sprite.Sprite):
         sheetWidth = sheet.get_width()
         frameHeight = sheet.get_height()
 
-        # 3000 / 10 = 300 exactly, so equal-width slicing lines up cleanly
-        # with no drift — still computing each boundary independently from
-        # the total (rather than accumulating a stride) so this stays safe
-        # if the sheet is ever swapped for one that doesn't divide evenly.
+        #Split the sprite sheet into individual frames.
         frames = []
         for i in range(numFrames):
             startX = round(i * sheetWidth / numFrames)
@@ -778,12 +766,6 @@ class Bomb(pygame.sprite.Sprite):
                 frame = pygame.transform.scale_by(frame, scale)
             frames.append(frame)
 
-        # Same animation pattern as Player.animate(): a currentFrames list,
-        # animIndex/animTimer/animSpeed driving a looping timer-based
-        # advance, and the rect rebuilt from the new image each time while
-        # re-anchoring on midbottom — so if frame sizes differ by a pixel or
-        # two (they do here, since 13 doesn't divide the sheet evenly), the
-        # sprite stays consistently positioned instead of drifting.
         self.currentFrames = frames
         self.animIndex = 0
         self.animTimer = 0
@@ -795,35 +777,15 @@ class Bomb(pygame.sprite.Sprite):
         self.speed = speed
         self.damage = damage
 
-        # Falls untouched (no animation yet) until it lands on a platform.
-        # egg bomb.png's 10 frames are actually three phases: 0-4 is the
-        # fuse burning down, explosionFrameIndex (5) onward is the actual
-        # blast, and the last couple are the smoke clearing. So instead of
-        # an arbitrary tick countdown, the explosion (and the hit) is tied
-        # to the animation itself reaching that blast frame — it always
-        # looks right regardless of animSpeed. hasDealtDamage makes sure
-        # the hit only lands once during the blast, not every frame of it.
+        # State of the bomb and frame index at which the bomb explode
         self.landed = False
         self.exploded = False
         self.explosionFrameIndex = min(explosionFrameIndex, len(self.currentFrames) - 1)
         self.hasDealtDamage = False
 
-        # If Feathers dropped this while Prickle was standing on a specific
-        # platform, it should only ever land on THAT one (and stay there
-        # until it explodes) rather than whichever platform it happens to
-        # pass over first — otherwise it can land somewhere Prickle never
-        # even was. None (e.g. Prickle was airborne when it dropped) falls
-        # back to the old "land on whatever's below it" behavior.
+        #The platform prickle is currently on
         self.targetPlatform = targetPlatform
 
-        # The platform actually landed on, plus the bomb's fixed vertical
-        # offset from that platform's rect (captured the instant it lands).
-        # Platforms get re-positioned every frame by Scene3 as the camera
-        # scrolls (rect.y = baseY + scrollY) — re-deriving the bomb's y from
-        # landedPlatform.rect.y + landOffset each frame keeps it locked to
-        # that exact spot on the platform through any amount of scrolling,
-        # instead of staying pinned to a fixed screen position while the
-        # platform (and everything else) scrolls out from under it.
         self.landedPlatform = None
         self.landOffset = 0
 
@@ -897,18 +859,9 @@ class Feathers(Enemy):
                 frames.append(frame)
             return frames
 
-        # feather_movement.png is a 5-frame flapping-flight loop.
         self.flyRFrames = extractFrames(sheet, 5)
         self.flyLFrames = [pygame.transform.flip(f, True, False) for f in self.flyRFrames]
 
-        # feather_hurt.png is a single pose (not a sheet), with the same
-        # opaque-black-background situation as egg bomb.png, so it needs the
-        # same load-as-RGB -> colorkey -> convert_alpha treatment. Scaled by
-        # matching flight-frame height (rather than reusing `scale`, which
-        # was calibrated for feather_movement.png's very different raw size)
-        # so the bird doesn't visibly grow/shrink the instant it gets hurt.
-        # Wrapped in single-element lists so it drops into the exact same
-        # currentFrames/animIndex machinery as flyRFrames/flyLFrames below.
         hurtRaw = pygame.image.load(r"feather_assets/feather_hurt.png").convert()
         hurtRaw.set_colorkey((0, 0, 0))
         hurtRaw = hurtRaw.convert_alpha()
@@ -922,48 +875,26 @@ class Feathers(Enemy):
         self.animTimer = 0
         self.animSpeed = 6
 
-        # Hurt state — same shape as Player's/Raccoon's isHurt/hurtTimer:
-        # takeDamage() (overridden below) flips this on, animate() shows the
-        # hurt pose while it's true, and it counts back down to 0 on its own.
         self.isHurt = False
         self.hurtTimer = 0
         self.hurtDuration = 15
 
-        # Hurt sound — same per-instance load pattern as Raccoon's
-        # raccoon_whimper. Feathers is only ever created once per scene, so
-        # there's no need for Bomb's shared-class-attribute caching trick.
         self.hurt_sound = pygame.mixer.Sound(r"feather_assets/bird_hurt.mp3")
 
-        # feather_dead.png, unlike hurt/bomb, already has a real alpha
-        # channel (checked — no opaque black background), so it just needs
-        # convert_alpha(), no colorkey step. Height-matched to the flight
-        # frames like the hurt pose, then shrunk further by deadScaleFactor
-        # so the fallen bird reads as smaller/deflated rather than the same
-        # size as it was alive.
         deadRaw = pygame.image.load(r"feather_assets/feather_dead.png").convert_alpha()
         deadScale = (self.flyRFrames[0].get_height() / deadRaw.get_height()) * deadScaleFactor
         deadImage = pygame.transform.smoothscale_by(deadRaw, deadScale)
         self.deadRImage = deadImage
         self.deadLImage = pygame.transform.flip(deadImage, True, False)
 
-        # Death — once hp hits 0, Feathers stops flying/wandering/dropping
-        # bombs and instead falls (same landing-from-above search Bomb
-        # uses, via _findLandingSurface, which also sees Scene3's invisible
-        # floor platform) until it lands on the nearest platform below it,
-        # where it then stays put showing feather_dead.png.
+        # Death physics of Feather
         self.isDead = False
         self.deathFallSpeed = 6
         self.landed = False
         self.landedPlatform = None
         self.landOffset = 0
 
-        # Brief brightness flash on hit — same trick as Nest's hit-flash
-        # (BLEND_RGB_ADD, which only touches RGB and leaves the sprite's
-        # transparency alone). Feathers cycles through several different
-        # animated surfaces rather than Nest's fixed per-hit frame list, so
-        # the brightened copies are cached per exact surface (id-keyed)
-        # instead of per frame index — still just a handful of distinct
-        # surfaces total (fly/hurt/dead frames), so the cache stays small.
+        # Brief brightness flash on hit 
         self.flashFrames = flashFrames
         self.flashAmount = flashAmount
         self.flashTimer = 0
@@ -976,46 +907,27 @@ class Feathers(Enemy):
 
         self.facingRight = True
 
-        # Horizontal wander — picks a random x within wanderRange of wherever
-        # it currently is, drifts toward it, then picks a new one, so it
-        # reads as "flying left and right randomly" rather than patrolling a
-        # fixed line.
+        # Random horizontal movement
         self.speed = 4
         self.wanderRange = wanderRange
         self.wanderTargetX = self.rect.centerx
         self.wanderTimer = 0
         self.wanderChangeRate = random.randint(60, 150)
 
-        # Vertical tracking — eases toward hoverOffset px above Prickle's
-        # current on-screen position every frame. Reading player.rect
-        # directly (rather than tracking scrollY/baseY like a background
-        # platform would) means this "just works" through camera scrolling —
-        # it's always chasing wherever Prickle visibly is right now.
+        # Vertical space between Prickle and Feathers 
         self.hoverOffset = hoverOffset
         self.verticalSpeed = 6
 
-        # Vertical wander — same idea as the horizontal wander above, just
-        # added on top of the hover-above-Prickle baseline instead of
-        # replacing it: a random offset within verticalWanderRange that
-        # changes every so often, so the target y drifts up and down
-        # unpredictably around hoverOffset rather than tracking Prickle in
-        # a perfectly smooth, predictable line.
+        # Random vertical movement
         self.verticalWanderRange = verticalWanderRange
         self.verticalWanderOffset = 0
         self.verticalWanderTimer = 0
         self.verticalWanderChangeRate = random.randint(60, 150)
 
-        # Keeps the whole sprite on screen on both axes — without this, a
-        # large hoverOffset can push Feathers' target above y=0 (off the top
-        # of the screen) whenever Prickle is already near the top himself,
-        # since the raw target is just "player's y minus hoverOffset" with
-        # nothing stopping it from going negative.
+        # Keeps the Feather on screen on both x & y
         self.screenMargin = 20
 
-        # Bomb dropping — a new Bomb every bombIntervalSeconds, added straight
-        # into bombGroup (same constructor-injection pattern as Player's
-        # quillGroup) so the scene can update/draw/collide them without
-        # Feathers needing to know anything about the rest of the scene.
+        # Bomb settings
         self.bombGroup = bombGroup
         self.bombInterval = FPS * bombIntervalSeconds
         self.bombTimer = 0

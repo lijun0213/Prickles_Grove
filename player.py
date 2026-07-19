@@ -26,10 +26,6 @@ class Player(pygame.sprite.Sprite):
 
         self.bgWidth = bgWidth
 
-        # bgHeight is optional — scenes with a background no taller than the
-        # screen (no vertical scrolling) can just omit it. When it IS taller,
-        # this is what lets the camera-follow below know how much room there
-        # is to scroll into.
         self.bgHeight = bgHeight if bgHeight is not None else SCREEN_HEIGHT
 
         self.player_hpFull = pygame.image.load(r"player_assets/player_hpFull.png").convert_alpha()
@@ -109,11 +105,6 @@ class Player(pygame.sprite.Sprite):
         self.imageOffsetY = 0
 
         self.velocityY = 0
-
-        # Passive horizontal drift — normally 0, since A/D directly set
-        # position every frame. Only used for a diagonal bounce-pad launch
-        # (see handlePlatforms): A/D still override it instantly, and it's
-        # cleared on any normal landing so the drift only lasts the one arc.
         self.velocityX = 0
 
         self.onGround = True
@@ -143,7 +134,7 @@ class Player(pygame.sprite.Sprite):
         self.currentPlatform = None
         self.dropThroughPlatform = None
         self.dropThroughTimer = 0
-        self.dropThroughFrames = 20  # frames to ignore a platform after dropping through it
+        self.dropThroughFrames = 20  
         self.platformLandingOffset = 8
 
         self.maxHP = 3
@@ -155,29 +146,20 @@ class Player(pygame.sprite.Sprite):
         self.hurtTimer = 0
         self.hurtDuration = 15
 
-        # HP-bar hit flash — same BLEND_RGB_ADD trick as Nest's/Feathers'
-        # hit-flash, but reddened rather than brightened, so the heart icons
-        # themselves glow red for a moment whenever Prickle takes damage.
-        # Cached per exact surface (there are only ever two: full/empty).
+        # HP-bar hit flash 
         self.hpFlashDuration = 20
         self.hpFlashAmount = 140
-        self.spriteFlashAmount = 60  # subtler than the heart flash — just a slight red glow on Prickle himself
+
+        # slight red glow on Prickle himself
+        self.spriteFlashAmount = 60  
         self.hpFlashTimer = 0
         self._hpFlashCache = {}
         self.paralyzed = False
         self.paralyzeTimer = 0
 
-        # Vertical camera-follow (mirrors how bgWidth bounds horizontal
-        # movement). scrollY is how far the world has scrolled to keep
-        # Prickle on screen; maxScrollY is how far it CAN scroll before
-        # running out of background. cameraFollowY is the screen-y that,
-        # once crossed, starts pulling the camera up with him — it defaults
-        # to "never" (SCREEN_HEIGHT) since most scenes don't scroll; a scene
-        # that wants this can set self.player.cameraFollowY after construction,
-        # same way scenes already set self.player.groundY.
-        self.scrollY = 0
-        self.maxScrollY = max(0, self.bgHeight - SCREEN_HEIGHT)
-        self.cameraFollowY = SCREEN_HEIGHT
+        self.scrollY = 0 #how far the world has scrolled to keep Prickle on screen
+        self.maxScrollY = max(0, self.bgHeight - SCREEN_HEIGHT) #how far it CAN scroll before running out of background
+        self.cameraFollowY = SCREEN_HEIGHT # the screen-y that once crossed starts pulling the camera up
 
         self.cameraX = 0
         self.cameraY = 0
@@ -194,7 +176,7 @@ class Player(pygame.sprite.Sprite):
         prevBottom = self.rect.bottom
         wasGrounded = self.onGround
 
-        # Press S while standing on a platform to drop through it.
+        #drop through platform
         if platforms and keys[pygame.K_s] and wasGrounded and self.currentPlatform is not None:
             self.dropThroughPlatform = self.currentPlatform
             self.dropThroughTimer = self.dropThroughFrames
@@ -235,18 +217,6 @@ class Player(pygame.sprite.Sprite):
         self.animate(keys)
 
     def updateCamera(self):
-        # How far above the follow-line Prickle is trying to be (positive =
-        # above it). That overshoot gets absorbed into scrollY (shifting the
-        # world down instead of him up) — but only up to however much
-        # background is left to scroll. Once scrollY hits maxScrollY there's
-        # no more room to absorb, so any further climb has to actually raise
-        # him further up the screen instead of being silently discarded
-        # (discarding it is what caused the "invisible ceiling" bug — he'd
-        # get snapped back to cameraFollowY every frame forever once the
-        # background was fully scrolled). Symmetric on the way down too: as
-        # he descends back below the line, scroll credit is given back the
-        # same way, and once scrollY hits 0 he's free to actually drop below
-        # the line on screen.
         overshoot = self.cameraFollowY - self.rect.top
 
         if overshoot > 0:
@@ -256,6 +226,8 @@ class Player(pygame.sprite.Sprite):
 
         self.scrollY += consumed
         self.rect.top += consumed
+
+
 
     def handlePlatforms(self, platforms, prevBottom, wasGrounded):
         if self.velocityY < 0:
@@ -273,7 +245,7 @@ class Player(pygame.sprite.Sprite):
                     self.velocityX = 0
                     self.onGround = True
                     
-                    # RIDE LOGIC: Move with the platform if it is moving
+                    # Move with the platform if it is moving
                     if hasattr(platform, 'movementDeltaX'):
                         self.rect.x += platform.movementDeltaX
                         self.rect.y += platform.movementDeltaY
@@ -539,10 +511,7 @@ class Player(pygame.sprite.Sprite):
 
         self.rect.midbottom = old_midbottom
 
-        # Same hit-flash that reddens the HP hearts, applied to Prickle's
-        # own sprite too — just a slight tint (spriteFlashAmount is much
-        # lower than hpFlashAmount) so he visibly reacts to damage without
-        # looking like a completely different color.
+       # Prickle hurt flash effect
         if self.hpFlashTimer > 0:
             self.image = self._redFlashFrame(self.image, self.spriteFlashAmount)
 

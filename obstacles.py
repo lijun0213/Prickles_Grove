@@ -4,14 +4,9 @@ import random
 from settings import *
 from effects import Particle
 
-class Platform(pygame.sprite.Sprite):
-    """A branch (or similar) Prickle can jump onto to climb higher.
 
-    Collision follows the actual drawn shape of the image (not its full
-    rectangular bounds) — for each column of pixels we record the y of the
-    topmost non-transparent pixel, so landing on a diagonal/irregular branch
-    feels like landing on the branch itself, not an invisible box around it.
-    """
+#General Platform for all scenes
+class Platform(pygame.sprite.Sprite):
 
     def __init__(self, imagePath, x, y, angle=0, scale=1.0, blocksBullets=False, visible=True, hazard=False):
         super().__init__()
@@ -28,10 +23,8 @@ class Platform(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
         self.blocksBullets = blocksBullets
         self.visible = visible
-        # A platform Prickle takes periodic damage from just by touching it
-        # (e.g. the spiky branch) rather than a one-shot hit like a bullet.
-        # The actual "damage every N seconds while in contact" timing is
-        # handled by the scene, not here — this is just the marker.
+
+        # Hazard Condition, if true it will hurt prickle over time.
         self.hazard = hazard
 
         self.baseY = self.rect.y
@@ -72,12 +65,8 @@ class Platform(pygame.sprite.Sprite):
     def update(self):
         pass
 
-
+#Function to slice a sprite sheet into individual frames based on gaps between them
 def _sliceFramesByGaps(sheet):
-    """Split a sprite sheet into frames using its own transparent gaps,
-    instead of assuming every frame is the same fixed width. Needed for
-    sheets like the bouncy mushroom's, where the squash frame is wider than
-    the others so an even division would cut frames in half."""
     width, height = sheet.get_size()
     mask = pygame.mask.from_surface(sheet)
 
@@ -110,18 +99,8 @@ class Mushroom(pygame.sprite.Sprite):
         if scale != 1.0:
             sheet = pygame.transform.scale_by(sheet, scale)
 
-        # Slice into individual frames BEFORE rotating. The sheet is a
-        # horizontal strip of frames separated by thin transparent gaps —
-        # rotating the whole strip first smears those frames diagonally into
-        # each other, so the gap-detection merges two adjacent frames into
-        # one "slice" (visually showing two overlapping mushrooms). Rotating
-        # each frame individually after slicing avoids that entirely.
+        # Slice mushroom frames into individual frames 
         self.frames = _sliceFramesByGaps(sheet)
-
-        # angle in degrees, counter-clockwise (same convention as Platform's
-        # angle / pygame.transform.rotate) — rotates the cap visually AND
-        # tilts the bounce direction to match, so a tilted mushroom launches
-        # Prickle diagonally instead of straight up.
         self.angle = angle
         if angle:
             self.frames = [pygame.transform.rotate(f, angle) for f in self.frames]
@@ -135,9 +114,7 @@ class Mushroom(pygame.sprite.Sprite):
 
         self.bounceForce = bounceForce
 
-        # "Up" (0, -1) rotated by angle degrees, counter-clockwise, matching
-        # pygame.transform.rotate's convention on screen (y grows downward).
-        # angle=0 keeps the old straight-up bounce (bounceVX=0).
+        # angle of the mushroom
         rad = math.radians(angle)
         self.bounceVX = bounceForce * -math.sin(rad)
         self.bounceVY = bounceForce * -math.cos(rad)
@@ -192,15 +169,11 @@ class Mushroom(pygame.sprite.Sprite):
         self.image = self.frames[self.animIndex] if self.bouncing else self.frames[self.restFrame]
 
     def draw(self, screen):
-        # Frames have different widths/heights (independently cropped), so
-        # anchor by midbottom each draw instead of blitting at self.rect
-        # directly — otherwise wider/taller frames would appear to shift.
         drawRect = self.image.get_rect(midbottom=self.rect.midbottom)
         screen.blit(self.image, drawRect)
 
 
-#Bird nest — a bullet target, not a physical obstacle. Prickle passes
-#through it freely; only Prickle's bullets interact with it.
+#Bird nest — only prickle's bullets interact with it.
 class Nest(pygame.sprite.Sprite):
 
     def __init__(self, sheetPath, x, y, maxHits=5, scale=0.5, flashFrames=8, flashAmount=70):
@@ -215,10 +188,7 @@ class Nest(pygame.sprite.Sprite):
         self.destroyed = False
         self.frameIndex = 0
 
-        # Brief brightness flash on hit — a lightweight visual "ouch" cue
-        # separate from the persistent damage-frame change. flashAmount is
-        # how much brighter (0-255ish) each RGB channel gets; flashFrames is
-        # how many game-frames the flash lasts before fading back to normal.
+        # Nest flash on hit 
         self.flashFrames = flashFrames
         self.flashAmount = flashAmount
         self.flashTimer = 0
@@ -228,7 +198,7 @@ class Nest(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
         self.baseY = self.rect.y  # see Platform.baseY
 
-        # Hit sound — same per-instance load pattern as Feathers' hurt_sound.
+        # Nest hit sound
         self.hit_sound = pygame.mixer.Sound(r"feather_assets/nest_sound.mp3")
 
     def _brightFrame(self, frameIndex):
@@ -236,8 +206,6 @@ class Nest(pygame.sprite.Sprite):
         if bright is None:
             bright = self.frames[frameIndex].copy()
             amount = self.flashAmount
-            # BLEND_RGB_ADD only touches RGB, leaving per-pixel alpha (and so
-            # the shape's transparency) untouched.
             bright.fill((amount, amount, amount), special_flags=pygame.BLEND_RGB_ADD)
             self._brightCache[frameIndex] = bright
         return bright

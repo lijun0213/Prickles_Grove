@@ -56,23 +56,12 @@ class Scene3:
             Nest(r"scene3_assets/bird nest.png", x=510, y=-425, maxHits=5),
         ]
 
-        # Feathers — the Scene 3 boss. Flies left/right randomly and hovers
-        # a fixed distance above wherever Prickle currently is, so he's
-        # always overhead as Prickle climbs toward the nest.
+        # Feathers
         self.bombs = pygame.sprite.Group()
         self.feathers = Feathers(x=400, y=-350, bombGroup=self.bombs, hp=10, hoverOffset=250, wanderRange=150,
                                   bombIntervalSeconds=1)
 
-        # Golden petal — the actual reward, visible sitting on top of the
-        # nest from the start so Prickle can see what he's fighting for.
-        # Once the nest is destroyed it drops straight down to the floor
-        # (deliberately ignoring whatever branches/bridge it passes on the
-        # way, rather than resting on the nearest one — it belongs on the
-        # ground), then sits there to be picked up the same way Scene1's map
-        # pickup works: get close and press R. Pinned to the floor
-        # platform's scrolled position once landed, same landedPlatform/
-        # landOffset trick Bomb and dead Feathers use, so it stays put on
-        # screen as Prickle climbs back down.
+        # Golden petal
         self.petalImage = pygame.image.load(r"scene3_assets/golden petal.png").convert_alpha()
         self.petalImage = pygame.transform.scale_by(self.petalImage, 0.1)
         nest = self.nests[0]
@@ -85,24 +74,16 @@ class Scene3:
         self.petalFallSpeed = 6
         self.petalLandOffset = 0
 
-        # Scene-level state — mainly so main.py's death/Game-Over interlock
-        # (which checks scene.state/scene.deathTimer the same way it does for
-        # Scene4) has something to read. Scene3 itself only ever has two
-        # states: normal play, and the death sequence once Prickle's HP hits 0.
+        # Scene-level state 
         self.state = "PLAYING"
         self.deathTimer = 0
-        self.deathDuration = 120  # ~2 seconds at 60fps before Game Over shows
+        self.deathDuration = 120  # 2 seconds before Game Over shows
 
-        # Spiky branch — touching it doesn't hurt instantly/every frame,
-        # just a heart every 2 seconds for as long as Prickle stays in
-        # contact with it (rather than a one-shot hit like a bullet, or
-        # constant per-frame damage that would drain HP almost instantly).
+        # Spiky branch — decrese a heart every 2 seconds when prickle touch it
         self.hazardDamageTimer = 0
         self.hazardDamageInterval = FPS * 2
 
-        # Opening dialogue — same shared textbox component Scene1/Scene4
-        # use. Freezes the scene (see the top of update()) while it plays,
-        # then hands control back to Prickle once the last line is dismissed.
+        # Opening dialogue 
         self.portraits = {
             "prickle": pygame.transform.scale_by(self.player.idleFrames[0], 1.3),
             "feather": pygame.transform.scale_by(self.feathers.flyRFrames[0], 1.0),
@@ -120,27 +101,17 @@ class Scene3:
         self.feathersDeathDialogueShown = False
         self.spikyBranchDialogueShown = False
 
-        # Battle music — starts the instant the opening dialogue chain ends
-        # (see _endOpeningDialogue), stops the instant Feathers dies (see
-        # the isDead edge-check in update()).
+        # Battle music 
         pygame.mixer.music.load(r"scene3_assets/Backwater, Kamoking - Battle BGM.mp3")
         pygame.mixer.music.set_volume(0.2)
 
-        # Fade-to-black transition into Scene4, triggered the instant the
-        # petal is actually picked up (see updatePetal). levelComplete is
-        # the same signal Scene1/Scene0 use for their own scene handoffs —
-        # main.py watches for it to switch to Scene4 once the fade finishes.
+        # Fade-to-black transition into Scene4
         self.levelComplete = False
         self.fading = False
         self.fadeTimer = 0
         self.fadeDuration = 60  # 1 second at 60fps
 
     def _showDialogue(self, lines, speaker="prickle", style="center", next=None, onDismiss=None):
-        """Open the shared dialogue box, resolving a speaker key into this
-        scene's portrait/name. `next` is a convenience for the common case
-        (just set self.state once dismissed); pass a custom `onDismiss`
-        instead for chaining straight into another dialogue line, like the
-        opening back-and-forth below."""
         def defaultOnDismiss():
             self.player.controllable = True
             if next is not None:
@@ -165,17 +136,13 @@ class Scene3:
     def _showPrickleReply(self):
         self._showDialogue(["Say less!"], speaker="prickle", onDismiss=self._endOpeningDialogue)
 
+
+#Dialogues after Feather dead
     def _endOpeningDialogue(self):
-        # Same as _showDialogue's defaultOnDismiss (hands control back to
-        # Prickle), plus kicking off the battle music now that the
-        # back-and-forth is actually over.
         self.player.controllable = True
         pygame.mixer.music.play(loops=-1)
 
     def _showFeatherDeathTaunt(self):
-        # Fires once, right after Feathers dies — see the isDead edge-check
-        # in update(). "Say less"->kill her, and now she gets one last word
-        # in on her way down.
         self._showDialogue(
             ["Tell me where is it!"],
             speaker="prickle",
@@ -190,17 +157,12 @@ class Scene3:
         )
 
     def _showClimbTip(self):
-        # One-shot tutorial callout, chained onto the end of the post-death
-        # dialogue — no portrait/speaker, just a small corner hint box.
         self._showDialogue(
             ["Climb the trees and destroy the nest"],
             style="callout",
         )
 
     def _showSpikyBranchTip(self):
-        # Fires once, the first time a bullet fired from below is blocked by
-        # the spiky branch overhanging the nest — see the hazard check in
-        # handleBulletHits().
         self._showDialogue(
             ["Ugh I can't hit the nest... I need to hit it from above"],
             speaker="prickle",
@@ -227,16 +189,13 @@ class Scene3:
 
         prevRect = self.player.rect.copy()
 
-        # Platform sticking, walking-along-surface, "S" drop-through, and
-        # camera-follow are all handled generically inside Player now — just
-        # hand it this scene's platforms each frame.
+        # Platform sticking, walking-along-surface
         self.player.update(keys, platforms=self.platforms)
 
         self.handleWallCollisions(prevRect)
         self.handleHazardCollisions()
 
-        # Keep platforms/walls/nests anchored to the background art as the
-        # camera scrolls (Player owns scrollY; this scene just reacts to it).
+        # Keep platforms/walls/nests anchored to the background art for when camera moves vertically
         for platform in self.platforms:
             platform.rect.y = platform.baseY + self.player.scrollY
             platform.update()  # advances things like the mushroom's bounce animation
@@ -268,15 +227,12 @@ class Scene3:
         nest = self.nests[0]
 
         if not nest.destroyed:
-            # Still resting visibly on top of the nest — just ride along
-            # with it as it scrolls (nest.rect.y is kept in sync with
-            # scrollY earlier in update()).
+            # golden petal still resting on top of the nest
             self.petalRect.center = (nest.rect.centerx, nest.rect.top + self.petalRestOffset)
             return
 
         if not self.petalFalling and not self.petalLanded:
-            # The nest just got destroyed this frame — let go and start
-            # falling from wherever it was actually sitting.
+            # nest destroyed, petal starts falling
             self.petalFalling = True
 
         floor = self.platforms[0]  # the invisible floor strip, see __init__
@@ -292,8 +248,6 @@ class Scene3:
                 self.petalLanded = True
                 self.petalLandOffset = self.petalRect.bottom - floor.rect.y
             elif self.petalRect.top > SCREEN_HEIGHT + 500:
-                # Safety net in case topAt ever misses (shouldn't happen —
-                # the floor spans the full screen width).
                 self.petalRect.bottom = SCREEN_HEIGHT
                 self.petalFalling = False
                 self.petalLanded = True
@@ -321,18 +275,12 @@ class Scene3:
     def updateDeathSequence(self, keys):
         if self.deathTimer > 0:
             self.deathTimer -= 1
-        # Keep Prickle's death animation playing (Player.update already
-        # branches on isDeath internally); everything else in the scene
-        # freezes so Feathers/bombs don't keep acting on a dead player.
+        # Keep Prickle's death animation playing 
         self.player.update(keys, platforms=self.platforms)
 
     def handleBombHits(self):
         for bomb in list(self.bombs):
-            # Only the explosion itself can hurt Prickle — not the fall,
-            # not just sitting landed with its fuse burning. hasDealtDamage
-            # keeps this a one-time hit rather than damage every frame the
-            # blast/smoke animation is playing. The bomb removes itself
-            # once its animation finishes (see Bomb.animate).
+            # Only the explosion hurts Prickle
             if not bomb.exploded or bomb.hasDealtDamage:
                 continue
             if bomb.rect.colliderect(self.player.rect):
@@ -343,9 +291,6 @@ class Scene3:
         for bullet in list(self.bullets):
             hit = False
 
-            # Feathers herself — same takeDamage/HP pattern as Raccoon in
-            # Scene1 (both inherit it from Enemy), just a direct rect check
-            # here since there's only the one enemy rather than a group.
             if self.feathers.hp > 0 and bullet.rect.colliderect(self.feathers.rect):
                 self.feathers.takeDamage(1)
                 bullet.kill()
@@ -363,26 +308,20 @@ class Scene3:
             if hit:
                 continue
 
-            # Bullet-blocking platforms (e.g. the spiky branch) just stop
-            # the bullet outright — no hit-tracking, they're not a target.
-            # Uses shape-accurate collision (collidesRect), not just the
-            # bounding rect, since a rotated platform's rect can be much
-            # bigger than its visible sprite.
+            # Bullet-blocking platforms 
             for platform in self.platforms:
                 if not getattr(platform, "blocksBullets", False):
                     continue
                 if platform.collidesRect(bullet.rect):
                     bullet.kill()
-                    # The spiky branch overhangs the nest and blocks any
-                    # bullet fired up at it from below — one-shot hint the
-                    # first time that actually happens, nudging Prickle
-                    # toward climbing above it instead of shooting from the
-                    # ground forever.
+                    # show tip for prickle to use bouncy mushroom and get above
                     if getattr(platform, "hazard", False) and not self.spikyBranchDialogueShown:
                         self.spikyBranchDialogueShown = True
                         self._showSpikyBranchTip()
                     break
 
+
+    # for spiky branch to deal damage
     def handleHazardCollisions(self):
         if self.hazardDamageTimer > 0:
             self.hazardDamageTimer -= 1
@@ -397,26 +336,18 @@ class Scene3:
                 self.player.takeDamage(1)
                 self.hazardDamageTimer = self.hazardDamageInterval
         else:
-            # Not touching it anymore — reset so walking back onto it later
-            # starts a fresh 2-second countdown rather than picking up
-            # wherever the timer happened to be left off.
             self.hazardDamageTimer = 0
 
     def handleWallCollisions(self, prevRect):
         for wall in self.walls:
             if not self.player.rect.colliderect(wall.rect):
                 continue
-
-            # Use last frame's position to tell which side Prickle approached
-            # from, then clamp him back to that side of the wall.
             if prevRect.right <= wall.x:
                 self.player.rect.right = wall.x
             elif prevRect.left >= wall.x:
                 self.player.rect.left = wall.x
 
     def draw(self, screen):
-        # Anchor the bottom of the background to the bottom of the screen,
-        # then shift up by scrollY as Prickle climbs.
         bgY = SCREEN_HEIGHT - self.bgHeight + self.player.scrollY
         screen.blit(self.bg, (0, bgY))
 
