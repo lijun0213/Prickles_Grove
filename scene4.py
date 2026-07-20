@@ -278,7 +278,6 @@ class Scene4:
 
     def updateSwarm(self):
         self.boss.update(self.player, active=False)
-        self.boss.updateBuzz(self.player)
 
         self.wasps.update(self.player)
         for wasp in self.wasps:
@@ -292,8 +291,10 @@ class Scene4:
             hits = pygame.sprite.spritecollide(quill, self.wasps, False)
             for wasp in hits:
                 wasp.takeDamage(1)
-                wasp.buzzSound.stop()
-                wasp.buzzChannel.stop()
+                if hasattr(wasp, 'buzz_sound') and wasp.buzz_sound:
+                    wasp.buzz_sound.stop()
+                if hasattr(wasp, 'buzzChannel') and wasp.buzzChannel:
+                    wasp.buzzChannel.stop()
                 effects.create_impact_burst(quill.rect.center)
                 quill.kill()
 
@@ -314,7 +315,6 @@ class Scene4:
             self.boss.teleportSpots = [self.getRandomScreenSpot()]
 
         self.boss.update(self.player, active=True)
-        self.boss.updateBuzz(self.player)
         self.stings.update()
 
         for sting in list(self.stings):
@@ -342,8 +342,6 @@ class Scene4:
 
         # Defeating Queen now prompts player to shoot down the nest
         if self.boss.hp <= 0:
-            self.boss.buzz_sound.stop()
-            self.boss.buzzChannel.stop()
             self._showDialogue(
                 ["The Queen is defeated!", "Shoot down the Wasp Nest to retrieve the flower!"],
                 speaker="prickle",

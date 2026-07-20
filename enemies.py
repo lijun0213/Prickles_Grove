@@ -96,7 +96,7 @@ class Wasp(Enemy):
         self.wanderTarget = self.pickWanderTarget()
         self.wanderTimer = 0
         self.wanderChangeRate = 90  # frames before picking a new random spot
- 
+
         self.detectRange = 250
         self.attackRange = 60
         self.isAttacking = False
@@ -118,7 +118,6 @@ class Wasp(Enemy):
             
     def pickWanderTarget(self):
         margin = 60
-        # If SCREEN_WIDTH/HEIGHT aren't globally imported, adjust these to your fallback screen settings
         try:
             w, h = SCREEN_WIDTH, SCREEN_HEIGHT
         except NameError:
@@ -205,7 +204,6 @@ class Wasp(Enemy):
             self.buzzChannel.set_volume(0.0)
 
     def kill(self):
-        # Clean shutdown check if called directly outside takeDamage hooks
         if self.buzzChannel:
             self.buzzChannel.stop()
         super().kill()
@@ -300,13 +298,6 @@ class WaspQueen(Enemy):
         # Move speed towards player
         self.moveSpeed = 2.5
 
-        # --- Dynamic Spatial Audio Setup ---
-        self.buzz_sound = pygame.mixer.Sound(r"scene4_assets/wasp_buzz.mp3")
-        self.buzzChannel = pygame.mixer.find_channel()
-        if self.buzzChannel:
-            self.buzzChannel.play(self.buzz_sound, loops=-1)
-            self.buzzChannel.set_volume(0.0)
-
     def takeDamage(self, damage):
         if self.teleporting or self.hp <= 0:
             return  
@@ -319,8 +310,6 @@ class WaspQueen(Enemy):
 
         if self.hitsTaken >= self.maxHits:
             self.hp = 0
-            if self.buzzChannel:
-                self.buzzChannel.stop()
             self.kill()
         else:
             self.startTeleport()
@@ -332,8 +321,6 @@ class WaspQueen(Enemy):
 
     def update(self, player, active=False):
         if self.hp <= 0:
-            if self.buzzChannel:
-                self.buzzChannel.stop()
             return
         
         if not active:
@@ -409,26 +396,6 @@ class WaspQueen(Enemy):
             self.teleportPhase = None
             self.idleTeleportCooldown = 0
 
-    def updateBuzz(self, player):
-        """Linearly scales sound channel volume based on proximity to the player."""
-        if not self.buzzChannel or not self.buzzChannel.get_busy():
-            return
-
-        distance = pygame.math.Vector2(self.rect.center).distance_to(player.rect.center)
-        maxHearingDistance = 650.0  # The Queen is louder and can be heard from further away
-        
-        if distance < maxHearingDistance:
-            # Scale volume up to a max limit of 0.70
-            volume = (1.0 - (distance / maxHearingDistance)) * 0.7
-            self.buzzChannel.set_volume(volume)
-        else:
-            self.buzzChannel.set_volume(0.0)
-
-    def kill(self):
-        if self.buzzChannel:
-            self.buzzChannel.stop()
-        super().kill()
-
     def animate(self):
         if self.isAttacking:
             newFrames = self.attackRFrames if self.facingRight else self.attackLFrames
@@ -449,7 +416,6 @@ class WaspQueen(Enemy):
         oldCenter = self.rect.center
         self.rect = self.image.get_rect()
         self.rect.center = oldCenter
-
 class Sting(pygame.sprite.Sprite):
     def __init__(self, x, y, targetX, targetY, speed=7, maxRange=600):
         super().__init__()
