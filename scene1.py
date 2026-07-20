@@ -62,7 +62,8 @@ class Scene1:
         windowX, windowY = 900, 200
         self.escapeEnemies.add(
             EscapeEnemy(r"scene4_assets/queen_idle.png", 700, 200, windowX, windowY, startDelay=0, scale=1.0, numIdleFrames=4),
-            EscapeEnemy(r"feather_assets/feather_movement.png", 580, 130, windowX, windowY, startDelay=5, scale=0.4, numIdleFrames=5)
+            EscapeEnemy(r"feather_assets/feather_movement.png", 580, 130, windowX, windowY, startDelay=5, scale=0.4, numIdleFrames=5),
+            EscapeEnemy(r"scene2_assets/rat idle.png", 550, 290, windowX, windowY, startDelay=0, scale=0.8, numIdleFrames=5)
         )
 
         # State Machine Initialization
@@ -111,8 +112,12 @@ class Scene1:
         self.levelComplete = False
 
         # background music
-        pygame.mixer.music.load(r"scene1_assets/scene1_bgmusic.mp3")
-        pygame.mixer.music.set_volume(0.2)
+        self.bgMusic = r"scene0_assets/Inorimichite, Chika V2.mp3"
+        self.battleMusic = r"scene1_assets/Mystery & Crime Background Music.mp3"
+        self.battleMusicStarted = False
+
+        pygame.mixer.music.load(self.bgMusic)
+        pygame.mixer.music.set_volume(0.4)
         pygame.mixer.music.play(loops=-1)
 
         # sound effects
@@ -122,8 +127,6 @@ class Scene1:
         self.level_complete.set_volume(0.4)
 
     def _showDialogue(self, lines, speaker="prickle", style="center", next=None):
-        """Open the shared dialogue box, resolving a speaker key into this
-        scene's portrait/name, and wiring `next` up to Dialogue's onDismiss callback."""
         def onDismiss():
             self.player.controllable = True
             if next is not None:
@@ -177,6 +180,12 @@ class Scene1:
             for enemy in self.escapeEnemies
         )
         if nearEnemy:
+            # Switch to battle music when approaching enemy
+            if not self.battleMusicStarted:
+                self.battleMusicStarted = True
+                pygame.mixer.music.load(self.battleMusic)
+                pygame.mixer.music.set_volume(0.4)
+                pygame.mixer.music.play(loops=-1)
             self._showDialogue(["Wait... something's there!"], speaker="prickle", next="ESCAPE")
 
     def updateEscape(self):
@@ -200,6 +209,7 @@ class Scene1:
     def updateChase(self, keys):
         if self.player.rect.colliderect(self.raccoon.rect.inflate(80, 50)):
             self.raccoon.activate()
+
             self._showDialogue(
                 ["Try shooting your quills!", "Press LEFT CLICK to shoot!"],
                 speaker="prickle", next="SHOOT",
@@ -226,6 +236,14 @@ class Scene1:
             else:
                 self.raccoonDefeated = True
                 effects.create_surrender_sparkle(self.raccoon.rect.midtop)
+
+                # Revert music back to background theme
+                if self.battleMusicStarted:
+                    self.battleMusicStarted = False
+                    pygame.mixer.music.load(self.bgMusic)
+                    pygame.mixer.music.set_volume(0.4)
+                    pygame.mixer.music.play(loops=-1)
+
                 self._showDialogue(
                     ["W-wait! I surrender!", "This is the map!"],
                     speaker="raccoon", next="MAP",
@@ -279,8 +297,8 @@ class Scene1:
             effects.drawDoorGlow(screen, rect, self.doorGlowTimer)
 
         for enemy in self.enemies:
-            is_dead = getattr(enemy, 'isDead', False) or getattr(enemy, 'raccoonConfessed', False)
-            if getattr(enemy, 'flash_timer', 0) > 0 and not is_dead:
+            is_dead = enemy.isDead
+            if enemy.flash_timer > 0 and not is_dead:
                 flash_surf = enemy.image.copy()
                 flash_surf.fill((255, 50, 50, 255), special_flags=pygame.BLEND_RGBA_MULT)
                 screen.blit(flash_surf, (enemy.rect.x - self.cameraX, enemy.rect.y))

@@ -4,6 +4,7 @@ from settings import *
 from player import Player
 from enemies import Wasp, WaspQueen, Sting
 from obstacles import Platform, MovingPlatform
+from obstacles import Nest 
 import effects
 
 class Scene4:
@@ -27,26 +28,45 @@ class Scene4:
         # Drop ground away to handle platform pit hazards cleanly
         self.player.groundY = SCREEN_HEIGHT + 1000
 
-        # 2. Distribute platforms across the long scrolling horizon sequence
+        # 2. Distribute platforms & vines cleanly across the entire level width
         self.platforms = [
+            # Zone 1: Entry & Initial Jumps
             Platform(r"scene4_assets/flower_platform1.png", x=80, y=380, scale=0.5),
-            Platform(r"scene4_assets/flower_platform1.png", x=200, y=240, scale=0.5),
-            Platform(r"scene4_assets/vine1.png", x=230, y=260, scale=0.7),
-            MovingPlatform(r"scene4_assets/flower_platform2.png", x=400, y=380, scale=0.5, moveRange=100, speed=2, axis='X'),
-            Platform(r"scene4_assets/flower_platform1.png", x=750, y=320, scale=0.5),
-            MovingPlatform(r"scene4_assets/flower_platform2.png", x=1050, y=100, scale=0.5, moveRange=70, speed=1.5, axis='Y'),
-            MovingPlatform(r"scene4_assets/flower_platform2.png", x=1050, y=380, scale=0.5, moveRange=100, speed=1.5, axis='Y'),
-            Platform(r"scene4_assets/flower_platform1.png", x=1450, y=280, scale=0.5),
+            Platform(r"scene4_assets/flower_platform1.png", x=220, y=260, scale=0.5),
+            Platform(r"scene4_assets/vine1.png", x=250, y=280, scale=0.7),
+            MovingPlatform(r"scene4_assets/flower_platform2.png", x=420, y=380, scale=0.5, moveRange=100, speed=2, axis='X'),
+            
+            # Zone 2: Mid-Stage Traversal
+            Platform(r"scene4_assets/flower_platform1.png", x=700, y=320, scale=0.5),
+            MovingPlatform(r"scene4_assets/flower_platform2.png", x=1020, y=140, scale=0.5, moveRange=80, speed=1.5, axis='Y'),
+            MovingPlatform(r"scene4_assets/flower_platform2.png", x=1020, y=380, scale=0.5, moveRange=100, speed=1.5, axis='Y'),
+            
+            # Zone 3: Far-Right Expansion
+            Platform(r"scene4_assets/flower_platform1.png", x=1350, y=280, scale=0.5),
+            Platform(r"scene4_assets/vine1.png", x=1520, y=240, scale=0.7),
+            MovingPlatform(r"scene4_assets/flower_platform2.png", x=1680, y=350, scale=0.5, moveRange=90, speed=2, axis='X'),
+            Platform(r"scene4_assets/flower_platform1.png", x=1950, y=260, scale=0.5),
+            Platform(r"scene4_assets/vine1.png", x=2100, y=200, scale=0.7),
+            
+            # Final Destination Ground Platform at the end of the world
+            Platform(r"scene4_assets/flower_platform1.png", x=2250, y=340, scale=0.5),
         ]
+
+        self.endPlatform = self.platforms[-1]  # Target ground platform for falling flower
+
+        # Setup Wasp Nest directly above the final platform at the very end of the stage
+        self.nest = Nest(r"scene4_assets/wasp_nest.png", x=2270, y=160, maxHits=5, scale=0.2)
+
+        # Load broken nest image and match scale
+        self.brokenNestImg = pygame.image.load(r"scene4_assets/wasp_nest_broken.png").convert_alpha()
+        self.brokenNestImg = pygame.transform.scale_by(self.brokenNestImg, 0.2)
 
         startPlatform = self.platforms[0]
         self.player.rect.midbottom = (startPlatform.rect.centerx, startPlatform.rect.top)
         self.lastSafePos = self.player.rect.midbottom
 
-        # 3. Position the Boss Arena further down the long world path
-        self.bossTeleportSpots = [(1100, 200), (1350, 150), (1500, 250), (1250, 100)]
-        self.boss = WaspQueen(self.bossTeleportSpots[1][0], self.bossTeleportSpots[1][1],
-                             teleportSpots=self.bossTeleportSpots, stingGroup=self.quills)
+        # 3. Position the Boss Arena
+        self.boss = WaspQueen(1350, 150, teleportSpots=[], stingGroup=self.quills)
 
         self.bossGroup = pygame.sprite.Group()
         self.bossGroup.add(self.boss)
@@ -54,16 +74,23 @@ class Scene4:
         self.boss.stingGroup = self.stings
         self.bossEffects = pygame.sprite.Group()
 
+        # Track sting warning dialogue trigger
+        self.stingDialogueShown = False
+
         # Wave tracking
         self.wasps = pygame.sprite.Group()
         self.waveConfigurations = [3, 4, 5]
         self.currentWaveIndex = 0
 
         self.flowerImage = pygame.image.load(r"scene4_assets/eternal_flower.png").convert_alpha()
-        self.flowerImage = pygame.transform.scale_by(self.flowerImage, 0.25)
+        self.flowerImage = pygame.transform.scale_by(self.flowerImage, 0.5)
         self.flowerRect = None
         self.flowerCollected = False
         self.nearFlower = False
+        
+        # Flower physics variables for falling from nest
+        self.flowerFalling = False
+        self.flowerVelocityY = 0
 
         # Dialogue System Reference
         self.dialogue = dialogue_system
@@ -80,10 +107,6 @@ class Scene4:
         self.state = "INTRO"
         self.levelComplete = False
 
-        # Fade-to-black transition back to the main menu, triggered once the
-        # closing victory dialogue is dismissed (see _startVictoryFade).
-        # Same pattern as Scene3's Scene4 handoff — main.py watches
-        # levelComplete to know when the fade has actually finished.
         self.fading = False
         self.fadeTimer = 0
         self.fadeDuration = 60  # 1 second at 60fps
@@ -139,12 +162,36 @@ class Scene4:
         self.wasps.empty()
         numWasps = self.waveConfigurations[self.currentWaveIndex]
 
+        # Wave 2 (index 1) spawns from the left; Waves 1 and 3 spawn from the right
         for _ in range(numWasps):
-            sx = random.randint(1100, 1500)
+            if self.currentWaveIndex == 1:
+                sx = random.randint(100, 400)   # Spawn on the LEFT side
+            else:
+                sx = random.randint(1100, 1500) # Spawn on the RIGHT side
+                
             sy = random.randint(100, 250)
             wasp = Wasp(sx, sy)
             wasp.speed = 1.5
             self.wasps.add(wasp)
+
+    def getRandomScreenSpot(self):
+        """Calculates a random coordinate on either the LEFT or RIGHT side of current screen view."""
+        side = random.choice(["LEFT", "RIGHT"])
+        
+        if side == "LEFT":
+            minX = int(self.cameraX + 100)
+            maxX = int(self.cameraX + 250)
+        else:
+            minX = int(self.cameraX + SCREEN_WIDTH - 250)
+            maxX = int(self.cameraX + SCREEN_WIDTH - 100)
+
+        # Clamped inside world boundary limits
+        minX = max(50, minX)
+        maxX = min(self.worldWidth - 50, maxX)
+
+        targetX = random.randint(minX, max(minX + 1, maxX))
+        targetY = random.randint(100, 300)
+        return (targetX, targetY)
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -175,6 +222,8 @@ class Scene4:
         for platform in self.platforms:
             platform.update()
 
+        self.nest.update()
+
         # Core operational loops
         self.player.update(keys, platforms=self.platforms)
         self.quills.update()
@@ -190,8 +239,19 @@ class Scene4:
             self.updateSwarm()
         elif self.state == "BOSS_FIGHT":
             self.updateBossFight()
+        elif self.state == "DESTROY_NEST":
+            self.updateDestroyNest()
         elif self.state == "VICTORY":
             self.updateVictory(keys)
+
+        # Process physics for falling flower after nest destruction
+        if self.flowerFalling and self.flowerRect:
+            self.flowerVelocityY += 0.4  # Gravity
+            self.flowerRect.y += int(self.flowerVelocityY)
+            targetY = self.endPlatform.rect.top - self.flowerRect.height
+            if self.flowerRect.y >= targetY:
+                self.flowerRect.y = targetY
+                self.flowerFalling = False
 
     def updateDeathSequence(self):
         """Processes death sequence timers and tracks animations independently of controls."""
@@ -232,6 +292,8 @@ class Scene4:
             hits = pygame.sprite.spritecollide(quill, self.wasps, False)
             for wasp in hits:
                 wasp.takeDamage(1)
+                wasp.buzzSound.stop()
+                wasp.buzzChannel.stop()
                 effects.create_impact_burst(quill.rect.center)
                 quill.kill()
 
@@ -247,6 +309,10 @@ class Scene4:
                 )
 
     def updateBossFight(self):
+        # Override boss's teleport spot list dynamically before update
+        if self.boss.teleportPhase == "out" and self.boss.teleportTimer == 1:
+            self.boss.teleportSpots = [self.getRandomScreenSpot()]
+
         self.boss.update(self.player, active=True)
         self.boss.updateBuzz(self.player)
         self.stings.update()
@@ -255,6 +321,14 @@ class Scene4:
             if sting.rect.colliderect(self.player.rect):
                 self.player.applyParalysis(PARALYSIS_DURATION)
                 sting.kill()
+
+                # Trigger dialogue warning when first hit by a sting
+                if not self.stingDialogueShown:
+                    self.stingDialogueShown = True
+                    self._showDialogue(
+                        ["Ugh! Watch out for that sting!", "It paralyzes you for 3 seconds!"],
+                        speaker="prickle"
+                    )
 
         for quill in list(self.quills):
             if quill.rect.colliderect(self.boss.rect) and not self.boss.teleporting:
@@ -266,13 +340,31 @@ class Scene4:
                 effects.create_impact_burst(quill.rect.center)
                 quill.kill()
 
-        if self.boss.hp <= 0 and self.flowerRect is None:
-            self.flowerRect = self.flowerImage.get_rect(center=self.boss.rect.center)
+        # Defeating Queen now prompts player to shoot down the nest
+        if self.boss.hp <= 0:
+            self.boss.buzz_sound.stop()
+            self.boss.buzzChannel.stop()
             self._showDialogue(
-                ["The Eternal Flower...", "It's free."],
+                ["The Queen is defeated!", "Shoot down the Wasp Nest to retrieve the flower!"],
                 speaker="prickle",
-                next="VICTORY"
+                next="DESTROY_NEST"
             )
+
+    def updateDestroyNest(self):
+        """Handle Quill hits on the Wasp Nest until it turns black and drops the flower."""
+        for quill in list(self.quills):
+            if quill.rect.colliderect(self.nest.rect):
+                wasHit = self.nest.takeHit()
+                if wasHit:
+                    effects.create_impact_burst(quill.rect.center)
+                    quill.kill()
+
+                if self.nest.destroyed and self.flowerRect is None:
+                    # Spawn flower at nest center and initiate drop
+                    self.flowerRect = self.flowerImage.get_rect(center=self.nest.rect.center)
+                    self.flowerFalling = True
+                    self.flowerVelocityY = 0
+                    self.state = "VICTORY"
 
     def updateVictory(self, keys):
         if self.flowerCollected:
@@ -295,10 +387,6 @@ class Scene4:
             self.nearFlower = False
 
     def _startVictoryFade(self):
-        # Fires once the closing victory line is dismissed — hands control
-        # back to Prickle isn't needed here since the fade freezes gameplay
-        # immediately anyway, but keep the same contract as the other
-        # dialogue callbacks in case anything else reads controllable.
         self.player.controllable = True
         self.fading = True
 
@@ -313,6 +401,16 @@ class Scene4:
 
         for platform in self.platforms:
             screen.blit(platform.image, (platform.rect.x - self.cameraX, platform.rect.y))
+
+        # Render Nest relative to camera space
+        nestDrawRect = self.nest.rect.copy()
+        nestDrawRect.x -= self.cameraX
+        if self.nest.destroyed:
+            screen.blit(self.brokenNestImg, nestDrawRect)
+        elif self.nest.flashTimer > 0:
+            screen.blit(self.nest._brightFrame(self.nest.frameIndex), nestDrawRect)
+        else:
+            screen.blit(self.nest.frames[self.nest.frameIndex], nestDrawRect)
 
         for wasp in self.wasps:
             screen.blit(wasp.image, (wasp.rect.x - self.cameraX, wasp.rect.y))
@@ -348,6 +446,10 @@ class Scene4:
                 text = font.render("Press R to pick up", True, YELLOW)
                 screen.blit(text, (self.flowerRect.x - self.cameraX - 20, self.flowerRect.y - 30))
 
+        # Delegate yellow aura rendering to the effects module when paralyzed
+        if getattr(self.player, 'paralyzed', False):
+            effects.draw_paralysis_aura(screen, self.player, self.cameraX)
+
         # Player rendering updates
         screen.blit(self.player.image, (self.player.rect.x - self.cameraX, self.player.rect.y))
 
@@ -362,7 +464,7 @@ class Scene4:
         self.player.drawHP(screen)
         effects.update_and_draw_particles(screen, self.cameraX)
 
-        # Let shared global UI draw dialogue layer natively on top of everything
+        # Shared UI dialogue box rendering
         if self.dialogue.active:
             self.dialogue.draw(screen)
 

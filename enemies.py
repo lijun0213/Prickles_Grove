@@ -80,7 +80,7 @@ class Wasp(Enemy):
         self.currentFrames = self.idleRFrames
         self.animIndex = 0
         self.animTimer = 0
-        self.animSpeed = 10
+        self.animSpeed = 8
 
         self.image = self.currentFrames[0]
         self.rect = self.image.get_rect()
@@ -239,7 +239,7 @@ class WaspQueen(Enemy):
         self.stingGroup = stingGroup           
         self.stingRange = 400                  
         self.stingCooldown = 0
-        self.stingCooldownMax = 100  
+        self.stingCooldownMax = 45  
 
         queenIdle = pygame.image.load(r"scene4_assets/queen_idle.png").convert_alpha()
         queenIdle = pygame.transform.scale_by(queenIdle, scale)
@@ -264,7 +264,7 @@ class WaspQueen(Enemy):
         self.currentFrames = self.idleRFrames
         self.animIndex = 0
         self.animTimer = 0
-        self.animSpeed = 8
+        self.animSpeed = 4    
 
         self.image = self.currentFrames[0]
         self.rect = self.image.get_rect(center=(x, y))
@@ -275,8 +275,8 @@ class WaspQueen(Enemy):
         self.maxHits = 10
 
         self.attackRange = 70
-        self.attackCooldown = 0
-        self.attackCooldownMax = 90
+        self.attackCooldown = 120
+        self.attackCooldownMax = 40   
         self.isAttacking = False
         self.attackTimer = 0
 
@@ -288,14 +288,17 @@ class WaspQueen(Enemy):
         self.teleporting = False
         self.teleportPhase = None       
         self.teleportTimer = 0
-        self.teleportOutDuration = 15
-        self.teleportInDuration = 15
+        self.teleportOutDuration = 10
+        self.teleportInDuration = 10  
         self.idleTeleportCooldown = 0
-        self.idleTeleportCooldownMax = 300  
+        self.idleTeleportCooldownMax = 120 
 
         self.shakeTimer = 0
         self.shakeDuration = 12
         self.shakeMagnitude = 6
+
+        # Move speed towards player
+        self.moveSpeed = 2.5
 
         # --- Dynamic Spatial Audio Setup ---
         self.buzz_sound = pygame.mixer.Sound(r"scene4_assets/wasp_buzz.mp3")
@@ -355,8 +358,9 @@ class WaspQueen(Enemy):
             elif distance <= self.stingRange and self.stingCooldown == 0 and self.stingGroup is not None:
                 self.fireSting(player)
             else:
-                self.rect.x += (dx / distance) * 1.5
-                self.rect.y += (dy / distance) * 1.5
+                # Fast movement tracking
+                self.rect.x += (dx / distance) * self.moveSpeed
+                self.rect.y += (dy / distance) * self.moveSpeed
 
             self.facingRight = dx > 0
 

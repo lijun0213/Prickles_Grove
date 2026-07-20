@@ -23,6 +23,8 @@ class Game:
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock  = pygame.time.Clock()
 
+        self.dialogueSystem = Dialogue()
+
         try:
             self.bg = pygame.image.load(r"scene0_assets/scene 0 & 1.png").convert_alpha()
             bgWidth, bgHeight = self.bg.get_size()
@@ -32,8 +34,8 @@ class Game:
         except pygame.error:
             pass  
 
-        self.current_scene = 0  # 0 = main menu, 1-4 = scenes
-        self.scene = None
+        self.current_scene = 4  # 0 = main menu, 1-4 = scenes
+        self.scene = Scene4(self.dialogueSystem)
         self.running = True
 
         self.blink_timer = 0
@@ -62,7 +64,6 @@ class Game:
         # Scene4 takes a shared Dialogue instance (dialogue_system) rather
         # than owning its own like every other scene — created once here so
         # every Scene4() construction below can hand it the same one.
-        self.dialogueSystem = Dialogue()
 
     def run(self):
         while self.running:

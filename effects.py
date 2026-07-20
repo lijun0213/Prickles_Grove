@@ -284,3 +284,21 @@ def createRatDeathEffect(particleSystem, pos):
         )
 
         particleSystem.add(particle)
+
+def draw_paralysis_aura(screen, player, camera_x):
+    """Renders a glowing, pulsating yellow aura around the player when paralyzed."""
+    aura_size = 100
+    aura_surf = pygame.Surface((aura_size, aura_size), pygame.SRCALPHA)
+    
+    # Create a pulsing alpha effect
+    pulse = abs(pygame.time.get_ticks() % 1000 - 500) / 500.0  
+    alpha_glow = int(80 + pulse * 100) # Oscillates alpha transparency
+    
+    # Outer glow ring
+    pygame.draw.circle(aura_surf, (255, 235, 59, alpha_glow // 2), (aura_size // 2, aura_size // 2), 42)
+    # Inner solid glow
+    pygame.draw.circle(aura_surf, (255, 255, 0, alpha_glow), (aura_size // 2, aura_size // 2), 30)
+
+    # Position centered on player sprite
+    aura_rect = aura_surf.get_rect(center=(player.rect.centerx - camera_x, player.rect.centery))
+    screen.blit(aura_surf, aura_rect)
