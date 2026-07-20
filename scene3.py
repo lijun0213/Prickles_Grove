@@ -71,7 +71,7 @@ class Scene3:
         self.deathTimer = 0
         self.deathDuration = 120  # 2 seconds before Game Over shows
 
-        # Spiky branch — decrese a heart every 2 seconds when prickle touch it
+        # Spiky branch settings
         self.hazardDamageTimer = 0
         self.hazardDamageInterval = FPS * 2
 
@@ -200,7 +200,7 @@ class Scene3:
         self.handleWallCollisions(prevRect)
         self.handleHazardCollisions()
 
-        # Keep platforms/walls/nests anchored to the background art for when camera moves vertically
+        # Constantly update the platforms, walls, and nests to follow the player scrollY (so they move up and down with the camera)
         for platform in self.platforms:
             platform.rect.y = platform.baseY + self.player.scrollY
             platform.update()  # advances things like the mushroom's bounce animation
