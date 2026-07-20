@@ -959,16 +959,11 @@ class Feathers(Enemy):
                         self.landedPlatform = bestPlatform
                         self.landOffset = self.rect.bottom - bestPlatform.rect.y
 
-                # Safety net — if nothing catches it (e.g. no platforms
-                # passed in), stop it at the bottom of the screen instead of
-                # falling forever off-screen.
+                # stop it at the bottom of the screen instead of falling forever off-screen.
                 if not self.landed and self.rect.top > SCREEN_HEIGHT:
                     self.rect.bottom = SCREEN_HEIGHT
                     self.landed = True
             elif self.landedPlatform is not None:
-                # Stay pinned to the platform's current (scrolled) position,
-                # same trick as Bomb — re-derive from the platform's rect
-                # each frame instead of a fixed screen position.
                 self.rect.bottom = self.landedPlatform.rect.y + self.landOffset
 
             return
@@ -978,7 +973,7 @@ class Feathers(Enemy):
             if self.hurtTimer <= 0:
                 self.isHurt = False
 
-        # Horizontal: drift toward a randomly-changing target x.
+        # Random horizontal movement.
         self.wanderTimer += 1
         reachedTarget = abs(self.rect.centerx - self.wanderTargetX) < 6
         if reachedTarget or self.wanderTimer >= self.wanderChangeRate:
@@ -992,14 +987,7 @@ class Feathers(Enemy):
             self.rect.x += step if dx > 0 else -step
             self.facingRight = dx > 0
 
-        # Vertical: ease toward hoverOffset px above Prickle's current
-        # screen position — never snaps, so it smoothly rises as he climbs.
-        # A randomly-changing verticalWanderOffset is layered on top of that
-        # baseline (same picked-periodically pattern as the horizontal
-        # wander) so the target drifts up and down unpredictably instead of
-        # tracking Prickle in a perfectly smooth line. Clamped so the target
-        # itself never asks Feathers to leave the screen, regardless of how
-        # large hoverOffset/verticalWanderOffset are or where Prickle is.
+        # Random vertical movement while keeping Feathers above Prickle.
         self.verticalWanderTimer += 1
         if self.verticalWanderTimer >= self.verticalWanderChangeRate:
             self.verticalWanderOffset = random.randint(-self.verticalWanderRange, self.verticalWanderRange)
@@ -1017,9 +1005,6 @@ class Feathers(Enemy):
             step = min(self.verticalSpeed, abs(dy))
             self.rect.y += step if dy > 0 else -step
 
-        # Hard safety clamp on top of the eased tracking above — belt and
-        # braces in case Feathers ever starts off-screen (e.g. its initial
-        # spawn position) or something else nudges its rect directly.
         self.rect.x = max(self.screenMargin, min(SCREEN_WIDTH - self.screenMargin - self.rect.width, self.rect.x))
         self.rect.y = max(self.screenMargin, min(SCREEN_HEIGHT - self.screenMargin - self.rect.height, self.rect.y))
 
@@ -1031,15 +1016,11 @@ class Feathers(Enemy):
 
                 targetPlatform = getattr(player, "currentPlatform", None)
                 if targetPlatform is not None:
-                    # Drop it above wherever Prickle currently stands, clamped
-                    # to the platform's own width so a bomb aimed near one
-                    # edge still comes down over solid ground on that branch,
-                    # not past its side.
+                    # Drop it above wherever Prickle currently stands
                     dropX = max(targetPlatform.rect.left,
                                 min(targetPlatform.rect.right - 1, player.rect.centerx))
                 else:
-                    # Prickle's airborne — no specific platform to target,
-                    # so just drop from wherever Feathers currently is.
+                    # no specific platform to target, so just drop from wherever Feathers currently is.
                     dropX = self.rect.centerx
 
                 bomb = Bomb(dropX, self.rect.bottom, speed=self.bombSpeed, damage=self.bombDamage,

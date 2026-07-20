@@ -5,6 +5,7 @@ from player import Player
 from obstacles import InvisiblePlatform, Boulder, SporeCloud
 from enemies import Rat
 from effects import ParticleSystem
+from dialogue import Dialogue
 
 
 class Scene2:
@@ -153,6 +154,23 @@ class Scene2:
 
 
         # ==========================
+        # Opening dialogue
+        # ==========================
+        # Same shared textbox component every scene uses. Freezes the scene
+        # (see the top of update()) until dismissed, then hands control
+        # back to Prickle.
+
+        self.dialogue = Dialogue()
+        self.dialogue.show(
+            ["According to Nugget, Giant Rat lives here...", "How nasty... so many rats..."],
+            portrait=pygame.transform.scale_by(self.player.idleFrames[0], 1.3),
+            name="Prickle",
+            onDismiss=self._endOpeningDialogue,
+        )
+        self.player.controllable = False
+
+
+        # ==========================
         # Level completion
         # ==========================
 
@@ -162,12 +180,24 @@ class Scene2:
 
 
     # =====================================================
+    # Opening dialogue
+    # =====================================================
+
+    def _endOpeningDialogue(self):
+        self.player.controllable = True
+
+
+    # =====================================================
     # Update
     # =====================================================
 
     def update(self):
 
         keys = pygame.key.get_pressed()
+
+        if self.dialogue.active:
+            self.dialogue.update(keys)
+            return
 
 
         # Player movement + collision
@@ -361,3 +391,6 @@ class Scene2:
         # HUD
         self.player.drawHP(screen)
         self.player.drawAmmo(screen)
+
+        # Dialogue overlay, drawn last so it sits on top of everything
+        self.dialogue.draw(screen)

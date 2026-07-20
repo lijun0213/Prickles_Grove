@@ -548,9 +548,9 @@ class Scene2Boss:
 
         self.dialogue.show(
             [
-                "A giant rat blocks the way...",
-                "He seems strange, something isn't right...",
-                "I need to defeat it to continue!"
+                "Finally found you!",
+                "You look a bit different than I remember...",
+                "Anyways give me back my ancient seed!",
             ],
 
             portrait=self.portraits["prickle"],
@@ -582,8 +582,7 @@ class Scene2Boss:
 
         self.dialogue.show(
             [
-                "T-That can't be..!",
-                "You defeated me...",
+                "Ughh...",
                 "Fine you can have it back..",
                 "Feather is in the Thorned Canopy..."
             ],
