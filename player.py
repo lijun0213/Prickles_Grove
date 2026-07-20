@@ -405,8 +405,8 @@ class Player(pygame.sprite.Sprite):
             return
 
         ammoX = 30
-        ammoY = 63
-        spacing = 48
+        ammoY = 55
+        spacing = 43
 
         for i in range(self.maxAmmo):
             if i < self.ammo:
@@ -428,7 +428,7 @@ class Player(pygame.sprite.Sprite):
     def drawHP(self,screen):
         hpX = 20
         hpY = 10
-        spacing = 58
+        spacing = 45
 
         for i in range(self.maxHP):
             if i < self.hp:

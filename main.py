@@ -39,10 +39,6 @@ class Game:
         self.blink_timer = 0
         self.blink_show  = True
 
-        # Debug variables
-        self.showDebugCoords = True
-        self.debugFont = pygame.font.SysFont("Consolas", 16)
-
         # --- Added Game Over Tracking Properties ---
         self.game_over = False
         self.death_timer = 0
@@ -93,9 +89,6 @@ class Game:
                             self.death_timer = self.death_duration
                             self.selected_option = 0
 
-                if event.key == pygame.K_F1:
-                    self.showDebugCoords = not self.showDebugCoords
-
                 # --- Game Over Menu Navigation ---
                 if self.game_over:
                     if event.key in (pygame.K_a, pygame.K_LEFT, pygame.K_w, pygame.K_UP):
@@ -130,8 +123,8 @@ class Game:
 
                 # --- Normal Gameplay Key Bindings ---
                 if event.key == pygame.K_SPACE and self.current_scene == 0:
-                    self.current_scene = -1
-                    self.scene = Scene0()
+                    self.current_scene = 4
+                    self.scene = Scene4(self.dialogueSystem)
 
     def restart_level(self):
         self.game_over = False
@@ -245,11 +238,6 @@ class Game:
         if self.victory:
             self.draw_victory_menu()
 
-        if self.showDebugCoords:
-            self.draw_debug_coords()
-            self.draw_debug_keys()
-            self.draw_debug_anim()
-
         pygame.display.flip()
 
     def draw_game_over_menu(self):
@@ -307,45 +295,6 @@ class Game:
 
             self.screen.blit(menu_text, (SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT // 2 + 10))
             self.screen.blit(quit_text, (SCREEN_WIDTH // 2 + 80, SCREEN_HEIGHT // 2 + 10))
-
-    def draw_debug_coords(self):
-        mouseX, mouseY = pygame.mouse.get_pos()
-        label = self.debugFont.render(f"({mouseX}, {mouseY})", True, WHITE, BLACK)
-        labelX = mouseX + 14
-        labelY = mouseY + 14
-        if labelX + label.get_width() > SCREEN_WIDTH:
-            labelX = mouseX - 14 - label.get_width()
-        if labelY + label.get_height() > SCREEN_HEIGHT:
-            labelY = mouseY - 14 - label.get_height()
-        self.screen.blit(label, (labelX, labelY))
-
-    def draw_debug_keys(self):
-        keys = pygame.key.get_pressed()
-        states = [
-            ("A", keys[pygame.K_a]),
-            ("D", keys[pygame.K_d]),
-            ("SPACE", keys[pygame.K_SPACE]),
-            ("SHIFT", keys[pygame.K_LSHIFT]),
-        ]
-        text = "  ".join(f"{name}:{held}" for name, held in states)
-        label = self.debugFont.render(text, True, WHITE, BLACK)
-        self.screen.blit(label, (10, 10))
-
-    def draw_debug_anim(self):
-        if not self.scene or not hasattr(self.scene, "player"):
-            return
-        player = self.scene.player
-        namedSets = [
-            ("IDLE_R", player.idleFrames), ("IDLE_L", player.idleLeftFrames),
-            ("WALK_R", player.walkingRightFrames), ("WALK_L", player.walkingLeftFrames),
-            ("RUN_R", player.runningRightFrames), ("RUN_L", player.runningLeftFrames),
-            ("ATTACK_R", player.attackRightFrames), ("ATTACK_L", player.attackLeftFrames),
-            ("HURT_R", player.hurtRightFrames), ("HURT_L", player.hurtLeftFrames),
-        ]
-        setName = next((name for name, frames in namedSets if frames is player.currentFrames), "?")
-        text = f"anim:{setName}  frame:{player.animIndex}/{len(player.currentFrames)}  dir:{player.direction}  running:{player.isRunning}"
-        label = self.debugFont.render(text, True, WHITE, BLACK)
-        self.screen.blit(label, (10, 30))
 
     def draw_main_menu(self):
         if self.bg:

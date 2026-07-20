@@ -31,9 +31,6 @@ class Scene2Boss:
         self.bgWidth = self.bg.get_width()
         self.bgHeight = self.bg.get_height()
 
-        self.showCoords = True
-        self.debugFont = pygame.font.SysFont("Consolas",16)
-
 
         # ==========================
         # Music Loop for Boss level

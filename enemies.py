@@ -273,7 +273,7 @@ class WaspQueen(Enemy):
         self.maxHits = 10
 
         self.attackRange = 70
-        self.attackCooldown = 120
+        self.attackCooldown = 200
         self.attackCooldownMax = 40   
         self.isAttacking = False
         self.attackTimer = 0
@@ -289,7 +289,7 @@ class WaspQueen(Enemy):
         self.teleportOutDuration = 10
         self.teleportInDuration = 10  
         self.idleTeleportCooldown = 0
-        self.idleTeleportCooldownMax = 120 
+        self.idleTeleportCooldownMax = 175 
 
         self.shakeTimer = 0
         self.shakeDuration = 12
