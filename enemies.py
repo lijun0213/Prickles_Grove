@@ -416,6 +416,8 @@ class WaspQueen(Enemy):
         oldCenter = self.rect.center
         self.rect = self.image.get_rect()
         self.rect.center = oldCenter
+
+        
 class Sting(pygame.sprite.Sprite):
     def __init__(self, x, y, targetX, targetY, speed=7, maxRange=600):
         super().__init__()
@@ -681,32 +683,24 @@ class Raccoon(Enemy):
         self.rect = self.image.get_rect()
         self.rect.midbottom = oldMidBottom
 
+    def _findLandingSurface(rect, prevBottom, platforms):
+        bestPlatform = None
+        bestLandY = None
 
-def _findLandingSurface(rect, prevBottom, platforms):
-    """Shared 'landing from above' search — same shape as
-    Player.handlePlatforms: use each platform's actual drawn surface
-    (topAt), not its bounding box, and return whichever one the falling
-    rect would hit first. Used by both Bomb and Feathers' death-fall, so a
-    rotated/irregular platform (or the invisible floor strip) is landed on
-    the same way everywhere. Returns (platform, landY), both None if
-    nothing was hit this frame."""
-    bestPlatform = None
-    bestLandY = None
+        for platform in platforms:
+            if not rect.colliderect(platform.rect):
+                continue
 
-    for platform in platforms:
-        if not rect.colliderect(platform.rect):
-            continue
+            surfaceY = platform.topAt(rect.centerx)
+            if surfaceY is None:
+                continue
 
-        surfaceY = platform.topAt(rect.centerx)
-        if surfaceY is None:
-            continue
+            landingFromAbove = prevBottom <= surfaceY and rect.bottom >= surfaceY
+            if landingFromAbove and (bestLandY is None or surfaceY < bestLandY):
+                bestPlatform = platform
+                bestLandY = surfaceY
 
-        landingFromAbove = prevBottom <= surfaceY and rect.bottom >= surfaceY
-        if landingFromAbove and (bestLandY is None or surfaceY < bestLandY):
-            bestPlatform = platform
-            bestLandY = surfaceY
-
-    return bestPlatform, bestLandY
+        return bestPlatform, bestLandY
 
 
 class Bomb(pygame.sprite.Sprite):
