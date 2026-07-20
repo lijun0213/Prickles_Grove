@@ -582,8 +582,7 @@ class Scene2Boss:
 
         self.dialogue.show(
             [
-                "T-That can't be..!",
-                "You defeated me...",
+                "Ughh...",
                 "Fine you can have it back..",
                 "Feather is in the Thorned Canopy..."
             ],

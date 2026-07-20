@@ -23,19 +23,11 @@ class Scene3:
         self.player.rect.bottom = self.groundY
         self.player.groundY = self.groundY
 
-        # Once Prickle climbs above this screen-y, the camera starts
-        # following him upward instead of letting him keep climbing off the
-        # top of the screen. (Camera-follow itself now lives in Player —
-        # see Player.updateCamera — this just opts this scene into it.)
+
         self.player.cameraFollowY = 365
 
 
         self.platforms = [
-            # Floor strip along the bottom of the screen — invisible (not
-            # drawn), just a collision surface so falling bombs (and
-            # Prickle) land on solid ground instead of passing through.
-            # floor.png is a thin 500x3 sliver, stretched to span the full
-            # screen width but kept at its native (near-zero) thickness.
             Platform(r"scene3_assets/floor.png", x=0, y=SCREEN_HEIGHT - 3, scale=(SCREEN_WIDTH / 500, 1), visible=False),
             Platform(r"scene3_assets/branch_right.png", x=240, y=300, angle=22, scale = (2.2, 1.3)),
             Platform(r"scene3_assets/bridge.png", x=92, y=190, scale = (1.23, 1.1)),
@@ -87,10 +79,12 @@ class Scene3:
         self.portraits = {
             "prickle": pygame.transform.scale_by(self.player.idleFrames[0], 1.3),
             "feather": pygame.transform.scale_by(self.feathers.flyRFrames[0], 1.0),
+            "feather_dead": pygame.transform.scale_by(self.feathers.deadRImage, 1.0),
         }
         self.speakerNames = {
             "prickle": "Prickle",
             "feather": "Feather",
+            "feather_dead": "Feather",
         }
         self.dialogue = Dialogue()
         self._showDialogue(
@@ -152,7 +146,7 @@ class Scene3:
     def _showFeatherDeathReply(self):
         self._showDialogue(
             ["You will never reach it!", "My nest is guarded by a poisonous branch at the top of the tree! "],
-            speaker="feather",
+            speaker="feather_dead",
             onDismiss=self._showClimbTip,
         )
 
@@ -167,6 +161,17 @@ class Scene3:
             ["Ugh I can't hit the nest... I need to hit it from above"],
             speaker="prickle",
         )
+
+    def _showFeatherFlowerReply(self):
+        self._showDialogue(
+            ["It is with Queen Beatrice in the Petal Plains", "Don't kill me please!"],
+            speaker="feather_dead",
+            onDismiss=self._startPetalFade,
+        )
+
+    def _startPetalFade(self):
+        self.player.controllable = True
+        self.fading = True
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -265,7 +270,11 @@ class Scene3:
                     if keys[pygame.K_r]:
                         self.petalCollected = True
                         self.player.pickupItem_sound.play()
-                        self.fading = True
+                        self._showDialogue(
+                            ["Now, tell me where is my Eternal Flower!"],
+                            speaker="prickle",
+                            onDismiss=self._showFeatherFlowerReply,
+                        )
 
     def updateFade(self):
         self.fadeTimer += 1
