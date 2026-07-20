@@ -319,7 +319,7 @@ class Scene4:
 
         for sting in list(self.stings):
             if sting.rect.colliderect(self.player.rect):
-                self.player.applyParalysis(PARALYSIS_DURATION)
+                self.player.applyParalysis(60)
                 sting.kill()
 
                 # Trigger dialogue warning when first hit by a sting
@@ -445,8 +445,7 @@ class Scene4:
                 screen.blit(text, (self.flowerRect.x - self.cameraX - 20, self.flowerRect.y - 30))
 
         # Delegate yellow aura rendering to the effects module when paralyzed
-        if getattr(self.player, 'paralyzed', False):
-            effects.draw_paralysis_aura(screen, self.player, self.cameraX)
+        effects.draw_paralysis_aura(screen, self.player, self.cameraX)
 
         # Player rendering updates
         screen.blit(self.player.image, (self.player.rect.x - self.cameraX, self.player.rect.y))
