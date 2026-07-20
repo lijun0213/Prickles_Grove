@@ -584,7 +584,8 @@ class Scene2Boss:
             [
                 "T-That can't be..!",
                 "You defeated me...",
-                "Take t-this, you'll need it for your j-journey.."
+                "Fine you can have it back..",
+                "Feather is in the Thorned Canopy..."
             ],
 
             portrait=self.portraits["rat"],
@@ -605,7 +606,7 @@ class Scene2Boss:
             self.itemY,
             "scene2_assets/Ancient Seed (Clear).png",
             [
-                "A strange seed. Seems to date back several centuries..",
+                "My ancient seed.  ",
                 "Press R to travel onward."
             ],
             title="Teleport",

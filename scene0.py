@@ -5,9 +5,7 @@ from dialogue import Dialogue
 
 class Scene0:
     def __init__(self):
-        # Background — a wide establishing shot, scaled to fill the screen
-        # height (same approach as Scene1's background) so it scrolls
-        # horizontally as Prickle walks instead of being squashed to fit.
+        # Background 
         self.bg = pygame.image.load(r"scene0_assets/scene 0 & 1.png").convert_alpha()
         bgWidth, bgHeight = self.bg.get_size()
         scale = SCREEN_HEIGHT / bgHeight
@@ -32,35 +30,24 @@ class Scene0:
         # Where Prickle respawns if he falls in the pond below.
         self.spawnPos = self.player.rect.bottomleft
 
-        # Pond — a gap in the ground from world-x 625 to 850. Prickle has to
-        # jump clear across it; if he's still touching the ground (walked in,
-        # or came up short on the jump) anywhere in that span, he falls in
-        # and gets teleported back to the start.
+        # Pond location and sound effect 
         self.pondLeft = 625
         self.pondRight = 850
         self.splash_sound = pygame.mixer.Sound(r"scene0_assets/Splash sound.mp3")
 
-        # Tutorial callouts — small one-shot hint boxes (no portrait), same
-        # shared Dialogue component every scene uses. Each fires once, the
-        # instant Prickle's world-x crosses its trigger point, and freezes
-        # the scene (see the top of update()) until dismissed.
+        # Tutorial callouts 
         self.dialogue = Dialogue()
         self.moveTipShown = False
         self.sprintTipShown = False
         self.jumpTipShown = False
         self.pondTipShown = False
 
-        # Exit — reaching x=1270 lets Prickle press R to move on to Scene1.
-        # levelComplete is the same signal Scene1 uses for its own Scene4
-        # handoff — main.py watches for it to actually switch scenes.
+        # Prickle house door or Exit
         self.exitX = 1200
         self.nearExit = False
         self.levelComplete = False
 
-        # Background music — starts the instant the scene loads, stopped by
-        # main.py the moment levelComplete sends Prickle on to Scene1 (same
-        # pygame.mixer.music.stop() pattern main.py already uses for the
-        # other scene-to-scene handoffs).
+        # Background music 
         pygame.mixer.music.load(r"scene0_assets/Inorimichite, Chika V2.mp3")
         pygame.mixer.music.set_volume(0.2)
         pygame.mixer.music.play(loops=-1)

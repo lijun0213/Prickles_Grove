@@ -50,6 +50,15 @@ class Game:
         self.selected_option = 0  # 0 = Retry, 1 = Quit
         self.paused_by_esc = False
 
+        # --- Victory Menu Tracking Properties ---
+        # Same concept as the Game Over menu (dark fade-in overlay, options
+        # navigated the same way, reusing self.selected_option), just
+        # triggered by finishing Scene4 instead of dying. MAIN MENU returns
+        # to the title screen; EXIT quits the game entirely.
+        self.victory = False
+        self.victory_timer = 0
+        self.victory_duration = 120
+
         # Scene4 takes a shared Dialogue instance (dialogue_system) rather
         # than owning its own like every other scene — created once here so
         # every Scene4() construction below can hand it the same one.
@@ -77,7 +86,7 @@ class Game:
                             # ESC again while paused → resume
                             self.game_over = False
                             self.paused_by_esc = False
-                        elif not self.game_over:
+                        elif not self.game_over and not self.victory:
                             # Open the menu immediately — full alpha, no fade-in wait
                             self.game_over = True
                             self.paused_by_esc = True
@@ -93,16 +102,30 @@ class Game:
                         self.selected_option = 0
                     if event.key in (pygame.K_d, pygame.K_RIGHT, pygame.K_s, pygame.K_DOWN):
                         self.selected_option = 1
-                    
-                    if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+
+                    if event.key in (pygame.K_f, pygame.K_RETURN):
                         if self.selected_option == 0:  # Retry
                             if self.paused_by_esc:
                                 self.game_over = False
                                 self.paused_by_esc = False
                             else:
-                                self.restart_level()                        
+                                self.restart_level()
                         elif self.selected_option == 1:  # Quit to Main Menu
                             self.exit_to_menu()
+                    continue  # Skip checking normal gameplay key presses
+
+                # --- Victory Menu Navigation --- (same concept as Game Over)
+                if self.victory:
+                    if event.key in (pygame.K_a, pygame.K_LEFT, pygame.K_w, pygame.K_UP):
+                        self.selected_option = 0
+                    if event.key in (pygame.K_d, pygame.K_RIGHT, pygame.K_s, pygame.K_DOWN):
+                        self.selected_option = 1
+
+                    if event.key in (pygame.K_f, pygame.K_RETURN):
+                        if self.selected_option == 0:  # Main Menu
+                            self.exit_to_menu()
+                        elif self.selected_option == 1:  # Exit (quit the game)
+                            self.running = False
                     continue  # Skip checking normal gameplay key presses
 
                 # --- Normal Gameplay Key Bindings ---
@@ -112,8 +135,9 @@ class Game:
 
     def restart_level(self):
         self.game_over = False
+        self.victory = False
         self.death_timer = 0  # Reset overlay animation timer
-        
+
         # Instantiate a fresh copy of the scene based on active current_scene ID
         if self.current_scene == 1:
             self.scene = Scene1()
@@ -130,17 +154,12 @@ class Game:
 
     def exit_to_menu(self):
         self.game_over = False
+        self.victory = False
         self.paused_by_esc = False
         self.death_timer = 0
         self.current_scene = 0
         self.scene = None
 
-        # --- Standard Menu Scene Starting Navigation ---
-        if event.key == pygame.K_SPACE:
-            if self.current_scene == 0 :
-                self.current_scene = 3
-                self.scene = Scene3()
-                
     def update(self):
         self.blink_timer += 1
         if self.blink_timer >= 30:  
@@ -152,6 +171,13 @@ class Game:
             if self.death_timer < self.death_duration:
                 self.death_timer += 1
             return  # Stop updating the underlying level
+
+        # 1b. Same idea for the victory overlay — freeze the scene underneath
+        # while its fade-in plays.
+        if self.victory:
+            if self.victory_timer < self.victory_duration:
+                self.victory_timer += 1
+            return
 
         # 2. Update current active scene
         if self.current_scene != 0 and self.scene:
@@ -196,6 +222,12 @@ class Game:
                     pygame.mixer.music.stop()
                     self.current_scene = 4
                     self.scene = Scene4(self.dialogueSystem)
+            elif self.current_scene == 4:
+                if self.scene.levelComplete:
+                    pygame.mixer.music.stop()
+                    self.victory = True
+                    self.victory_timer = 0
+                    self.selected_option = 0
 
     def draw(self):
         self.screen.fill(BLACK)
@@ -208,6 +240,10 @@ class Game:
         # Draw the Game Over Menu UI Layer above the scene visual contents
         if self.game_over:
             self.draw_game_over_menu()
+
+        # Draw the Victory Menu UI Layer the same way
+        if self.victory:
+            self.draw_victory_menu()
 
         if self.showDebugCoords:
             self.draw_debug_coords()
@@ -245,6 +281,32 @@ class Game:
 
             self.screen.blit(retry_text, (SCREEN_WIDTH // 2 - 120, SCREEN_HEIGHT // 2 + 10))
             self.screen.blit(quit_text, (SCREEN_WIDTH // 2 + 40, SCREEN_HEIGHT // 2 + 10))
+
+    def draw_victory_menu(self):
+        """Same concept as draw_game_over_menu() — a fading dark overlay
+        with MAIN MENU / EXIT options — just triggered by winning instead of
+        dying. MAIN MENU returns to the title screen; EXIT quits the game
+        entirely."""
+        alpha = min(180, int((self.victory_timer / self.victory_duration) * 180))
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((10, 10, 10, alpha))
+        self.screen.blit(overlay, (0, 0))
+
+        if alpha >= 120:
+            font_title = pygame.font.SysFont("Arial", 48, bold=True)
+            font_menu  = pygame.font.SysFont("Arial", 24, bold=True)
+
+            title = font_title.render("VICTORY", True, YELLOW)
+            self.screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, SCREEN_HEIGHT // 2 - 85))
+
+            menu_color = YELLOW if self.selected_option == 0 else WHITE
+            quit_color = YELLOW if self.selected_option == 1 else WHITE
+
+            menu_text = font_menu.render("MAIN MENU", True, menu_color)
+            quit_text = font_menu.render("EXIT", True, quit_color)
+
+            self.screen.blit(menu_text, (SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT // 2 + 10))
+            self.screen.blit(quit_text, (SCREEN_WIDTH // 2 + 80, SCREEN_HEIGHT // 2 + 10))
 
     def draw_debug_coords(self):
         mouseX, mouseY = pygame.mouse.get_pos()

@@ -80,6 +80,14 @@ class Scene4:
         self.state = "INTRO"
         self.levelComplete = False
 
+        # Fade-to-black transition back to the main menu, triggered once the
+        # closing victory dialogue is dismissed (see _startVictoryFade).
+        # Same pattern as Scene3's Scene4 handoff — main.py watches
+        # levelComplete to know when the fade has actually finished.
+        self.fading = False
+        self.fadeTimer = 0
+        self.fadeDuration = 60  # 1 second at 60fps
+
         # Trigger Initial Dialogue State
         self._showDialogue(
             ["The flowers glow strangely here...", "Something's watching me."],
@@ -158,6 +166,10 @@ class Scene4:
             self.updateCamera()
             if self.boss:
                 self.boss.update(self.player, active=False)
+            return
+
+        if self.fading:
+            self.updateFade()
             return
 
         for platform in self.platforms:
@@ -273,15 +285,27 @@ class Scene4:
             if self.nearFlower and keys[pygame.K_r]:
                 self.flowerCollected = True
                 self.player.pickupItem_sound.play()
-                
+
                 self._showDialogue(
                     ["You recovered all the treasures!", "Prickle's Grove is safe again."],
                     speaker="prickle",
-                    next=None
+                    onDismiss=self._startVictoryFade,
                 )
-                self.levelComplete = True
         else:
             self.nearFlower = False
+
+    def _startVictoryFade(self):
+        # Fires once the closing victory line is dismissed — hands control
+        # back to Prickle isn't needed here since the fade freezes gameplay
+        # immediately anyway, but keep the same contract as the other
+        # dialogue callbacks in case anything else reads controllable.
+        self.player.controllable = True
+        self.fading = True
+
+    def updateFade(self):
+        self.fadeTimer += 1
+        if self.fadeTimer >= self.fadeDuration:
+            self.levelComplete = True
 
     def draw(self, screen):
         # Background positioning
@@ -341,3 +365,9 @@ class Scene4:
         # Let shared global UI draw dialogue layer natively on top of everything
         if self.dialogue.active:
             self.dialogue.draw(screen)
+
+        if self.fading:
+            alpha = int(255 * min(1, self.fadeTimer / self.fadeDuration))
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, alpha))
+            screen.blit(overlay, (0, 0))
