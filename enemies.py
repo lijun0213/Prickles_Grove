@@ -236,8 +236,8 @@ class WaspQueen(Enemy):
 
         self.stingGroup = stingGroup           
         self.stingRange = 400                  
-        self.stingCooldown = 0
-        self.stingCooldownMax = 45  
+        self.stingCooldown = 75
+        self.stingCooldownMax = 100
 
         queenIdle = pygame.image.load(r"scene4_assets/queen_idle.png").convert_alpha()
         queenIdle = pygame.transform.scale_by(queenIdle, scale)
@@ -288,8 +288,8 @@ class WaspQueen(Enemy):
         self.teleportTimer = 0
         self.teleportOutDuration = 10
         self.teleportInDuration = 10  
-        self.idleTeleportCooldown = 0
-        self.idleTeleportCooldownMax = 175 
+        self.idleTeleportCooldown = 120
+        self.idleTeleportCooldownMax = 180 
 
         self.shakeTimer = 0
         self.shakeDuration = 12
@@ -416,8 +416,6 @@ class WaspQueen(Enemy):
         oldCenter = self.rect.center
         self.rect = self.image.get_rect()
         self.rect.center = oldCenter
-
-        
 class Sting(pygame.sprite.Sprite):
     def __init__(self, x, y, targetX, targetY, speed=7, maxRange=600):
         super().__init__()
@@ -683,24 +681,32 @@ class Raccoon(Enemy):
         self.rect = self.image.get_rect()
         self.rect.midbottom = oldMidBottom
 
-    def _findLandingSurface(rect, prevBottom, platforms):
-        bestPlatform = None
-        bestLandY = None
 
-        for platform in platforms:
-            if not rect.colliderect(platform.rect):
-                continue
+def _findLandingSurface(rect, prevBottom, platforms):
+    """Shared 'landing from above' search — same shape as
+    Player.handlePlatforms: use each platform's actual drawn surface
+    (topAt), not its bounding box, and return whichever one the falling
+    rect would hit first. Used by both Bomb and Feathers' death-fall, so a
+    rotated/irregular platform (or the invisible floor strip) is landed on
+    the same way everywhere. Returns (platform, landY), both None if
+    nothing was hit this frame."""
+    bestPlatform = None
+    bestLandY = None
 
-            surfaceY = platform.topAt(rect.centerx)
-            if surfaceY is None:
-                continue
+    for platform in platforms:
+        if not rect.colliderect(platform.rect):
+            continue
 
-            landingFromAbove = prevBottom <= surfaceY and rect.bottom >= surfaceY
-            if landingFromAbove and (bestLandY is None or surfaceY < bestLandY):
-                bestPlatform = platform
-                bestLandY = surfaceY
+        surfaceY = platform.topAt(rect.centerx)
+        if surfaceY is None:
+            continue
 
-        return bestPlatform, bestLandY
+        landingFromAbove = prevBottom <= surfaceY and rect.bottom >= surfaceY
+        if landingFromAbove and (bestLandY is None or surfaceY < bestLandY):
+            bestPlatform = platform
+            bestLandY = surfaceY
+
+    return bestPlatform, bestLandY
 
 
 class Bomb(pygame.sprite.Sprite):

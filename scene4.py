@@ -319,7 +319,7 @@ class Scene4:
 
         for sting in list(self.stings):
             if sting.rect.colliderect(self.player.rect):
-                self.player.applyParalysis(60)
+                self.player.applyParalysis(20)
                 sting.kill()
 
                 # Trigger dialogue warning when first hit by a sting
